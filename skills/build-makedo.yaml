@@ -1,0 +1,8 @@
+description: Build makedo binary to bin/makedo
+steps:
+  - name: Get dependencies
+    command: go mod tidy
+    workdir: /home/bando/projects/thesis/proj/makedo/src
+  - name: Build makedo
+    command: go build -ldflags "-X makedo/internal/version.Version=$(cat ../VERSION)" -o ../bin/makedo .
+    workdir: /home/bando/projects/thesis/proj/makedo/src
