@@ -12,9 +12,9 @@ import (
 
 // transformation holds data for a pending AST transformation.
 type transformation struct {
-	codeBlock *ast.FencedCodeBlock
-	htmlBlock *ast.HTMLBlock
-	directive *Directive
+	codeBlock  *ast.FencedCodeBlock
+	htmlBlocks []*ast.HTMLBlock
+	directives []*Directive
 }
 
 type MakeDoTransformer struct {
@@ -40,36 +40,43 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 			return ast.WalkContinue, nil
 		}
 
-		next := codeBlock.NextSibling()
-		if next == nil {
-			return ast.WalkContinue, nil
+		var directives []*Directive
+		var htmlBlocks []*ast.HTMLBlock
+
+		// Collect consecutive HTML blocks that are valid directives
+		for next := codeBlock.NextSibling(); next != nil; next = next.NextSibling() {
+			htmlBlock, ok := next.(*ast.HTMLBlock)
+			if !ok {
+				break
+			}
+
+			content := extractHTMLBlockContent(htmlBlock, source)
+			if content == nil {
+				break
+			}
+
+			var offset int
+			if htmlBlock.Lines().Len() > 0 {
+				offset = htmlBlock.Lines().At(0).Start
+			}
+
+			directive, ok := ParseDirective(content, offset, t.Registry)
+			if !ok {
+				break
+			}
+
+			directives = append(directives, directive)
+			htmlBlocks = append(htmlBlocks, htmlBlock)
 		}
 
-		// Markdown comments are parsed into HTML blocked by goldmark
-		htmlBlock, ok := next.(*ast.HTMLBlock)
-		if !ok {
-			return ast.WalkContinue, nil
-		}
-
-		content := extractHTMLBlockContent(htmlBlock, source)
-		if content == nil {
-			return ast.WalkContinue, nil
-		}
-
-		var offset int
-		if htmlBlock.Lines().Len() > 0 {
-			offset = htmlBlock.Lines().At(0).Start
-		}
-
-		directive, ok := ParseDirective(content, offset, t.Registry)
-		if !ok {
+		if len(directives) == 0 {
 			return ast.WalkContinue, nil
 		}
 
 		transformations = append(transformations, transformation{
-			codeBlock: codeBlock,
-			htmlBlock: htmlBlock,
-			directive: directive,
+			codeBlock:  codeBlock,
+			htmlBlocks: htmlBlocks,
+			directives: directives,
 		})
 
 		return ast.WalkContinue, nil
@@ -78,11 +85,15 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 	// Apply transformations
 	for _, tr := range transformations {
 		makedo := NewMakeDoCodeBlock(tr.codeBlock)
-		makedo.AddDirective(tr.directive)
+		for _, d := range tr.directives {
+			makedo.AddDirective(d)
+		}
 
 		parent := tr.codeBlock.Parent()
 		parent.ReplaceChild(parent, tr.codeBlock, makedo)
-		parent.RemoveChild(parent, tr.htmlBlock)
+		for _, htmlBlock := range tr.htmlBlocks {
+			parent.RemoveChild(parent, htmlBlock)
+		}
 	}
 }
 

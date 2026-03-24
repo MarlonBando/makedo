@@ -146,27 +146,38 @@ func VerifyMarkdown(mdPath string) error {
 		startLine := lineNumber(source, lines.At(0).Start)
 		br := execBlock(block, source)
 
-		// Try each directive handler
-		//TODO: this is atrocious let's find a better way to handle directives.
-		result := out(block, source, br, startLine)
-		if result == nil {
-			result = cmd(block, source, br, startLine)
-		}
-
-		if result == nil {
+		// Process all directives on this block
+		directives := block.Directives()
+		if len(directives) == 0 {
 			return ast.WalkContinue, nil
 		}
 
-		testNum++
-		fmt.Printf("test %d... ", testNum)
+		for _, directive := range directives {
+			var result *TestResult
+			keyword := directive.KeywordString(source)
 
-		if result.Passed {
-			fmt.Println("succeeded")
-		} else {
-			fmt.Println("failed")
+			switch keyword {
+			case "out":
+				result = out(block, source, br, startLine)
+			case "cmd":
+				result = cmd(block, source, br, startLine)
+			}
+
+			if result == nil {
+				continue
+			}
+
+			testNum++
+			fmt.Printf("test %d... ", testNum)
+
+			if result.Passed {
+				fmt.Println("succeeded")
+			} else {
+				fmt.Println("failed")
+			}
+
+			results = append(results, result)
 		}
-
-		results = append(results, result)
 		return ast.WalkContinue, nil
 	})
 
