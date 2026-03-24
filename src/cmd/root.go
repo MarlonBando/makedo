@@ -8,6 +8,8 @@ import (
 	"makedo/internal/version"
 )
 
+//TODO: add version flag where we get only the version in return
+
 var rootCmd = &cobra.Command{
 	Use:   "makedo",
 	Short: "A markdown-based task runner",

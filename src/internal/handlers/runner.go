@@ -48,11 +48,13 @@ func RunMarkdownFile(mdFile string) error {
 		glamour.WithStyles(getNoIndentStyle()),
 		glamour.WithWordWrap(0),
 	)
+
 	if err != nil {
 		return err
 	}
 
 	md := goldmark.New(
+
 		goldmark.WithExtensions(
 			nodes.NewMakeDoExtension(),
 		),
