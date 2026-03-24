@@ -23,46 +23,45 @@ type TestResult struct {
 	Error     error
 }
 
+// blockResult holds the result of executing a code block
+type blockResult struct {
+	output []byte
+	err    error
+}
+
 // lineNumber converts a byte offset to a 1-indexed line number
 func lineNumber(source []byte, offset int) int {
-	//TODO: what if we have a \n in a comment? We shouldn't count that???
 	return bytes.Count(source[:offset], []byte{'\n'}) + 1
 }
 
-func out(block *nodes.MakeDoCodeBlock, source []byte) *TestResult {
+// execBlock executes a code block and returns the output and error
+func execBlock(block *nodes.MakeDoCodeBlock, source []byte) blockResult {
+	code := block.Code(source)
+	cmd := exec.Command(os.Getenv("SHELL"), "-c", string(code))
+	output, err := cmd.Output()
+	return blockResult{output: output, err: err}
+}
+
+func out(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
 	directive := block.GetDirective("out", source)
 	if directive == nil {
 		return nil
 	}
 
-	// TODO: what if multiple out directives?
-
-	lines := block.Lines()
-	startOffset := lines.At(0).Start
-	startLine := lineNumber(source, startOffset)
-
 	expected := directive.ContentString(source)
-	code := block.Code(source)
 
-	// Execute the command
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", string(code))
-	output, err := cmd.Output()
-
-	// If execution error, fail immediately without checking output
-	if err != nil {
+	if br.err != nil {
 		return &TestResult{
 			Passed:    false,
 			StartLine: startLine,
 			Expected:  expected,
-			Actual:    string(output),
-			Error:     err,
+			Actual:    string(br.output),
+			Error:     br.err,
 		}
 	}
 
-	// TODO: how to handle new lines in stdout???
-	actual := strings.TrimRight(string(output), "\n")
+	actual := strings.TrimRight(string(br.output), "\n")
 
-	//NOTE: It checks if it's contained by default
 	re, err := regexp.Compile(expected)
 	if err != nil {
 		return &TestResult{
@@ -70,26 +69,46 @@ func out(block *nodes.MakeDoCodeBlock, source []byte) *TestResult {
 			StartLine: startLine,
 			Expected:  expected,
 			Actual:    actual,
-			Error:     fmt.Errorf("Your regex expression '%s' is invalid: %w", expected, err),
-		}
-	}
-
-	if !re.MatchString(actual) {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  expected,
-			Actual:    actual,
-			Error:     nil,
+			Error:     fmt.Errorf("invalid regex '%s': %w", expected, err),
 		}
 	}
 
 	return &TestResult{
-		Passed:    true,
+		Passed:    re.MatchString(actual),
 		StartLine: startLine,
 		Expected:  expected,
 		Actual:    actual,
-		Error:     nil,
+	}
+}
+
+func cmd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
+	directive := block.GetDirective("cmd", source)
+	if directive == nil {
+		return nil
+	}
+
+	// Code block must succeed first
+	if br.err != nil {
+		return &TestResult{
+			Passed:    false,
+			StartLine: startLine,
+			Expected:  "code block to succeed",
+			Actual:    string(br.output),
+			Error:     br.err,
+		}
+	}
+
+	// Run verification command
+	command := directive.ContentString(source)
+	verifyCmd := exec.Command(os.Getenv("SHELL"), "-c", command)
+	err := verifyCmd.Run()
+
+	return &TestResult{
+		Passed:    err == nil,
+		StartLine: startLine,
+		Expected:  "exit 0",
+		Actual:    command,
+		Error:     err,
 	}
 }
 
@@ -121,9 +140,20 @@ func VerifyMarkdown(mdPath string) error {
 		}
 
 		block := n.(*nodes.MakeDoCodeBlock)
-		result := out(block, source)
+
+		// Execute block once
+		lines := block.Lines()
+		startLine := lineNumber(source, lines.At(0).Start)
+		br := execBlock(block, source)
+
+		// Try each directive handler
+		//TODO: this is atrocious let's find a better way to handle directives.
+		result := out(block, source, br, startLine)
 		if result == nil {
-			// No "out" directive, skip
+			result = cmd(block, source, br, startLine)
+		}
+
+		if result == nil {
 			return ast.WalkContinue, nil
 		}
 

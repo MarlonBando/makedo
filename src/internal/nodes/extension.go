@@ -118,6 +118,7 @@ type MakeDoExtension struct {
 func NewMakeDoExtension() *MakeDoExtension {
 	r := NewRegistry()
 	r.Register("out")
+	r.Register("cmd")
 	return &MakeDoExtension{Registry: r}
 }
 
