@@ -17,9 +17,7 @@ type transformation struct {
 	directives []*Directive
 }
 
-type MakeDoTransformer struct {
-	Registry *Registry
-}
+type MakeDoTransformer struct{}
 
 // Scan the AST for FenceCodeBlock followed by an HTML comment block.
 // If the comment is a directive (keyword + content), replace both nodes with a MakeDoCodeBlock.
@@ -60,7 +58,7 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 				offset = htmlBlock.Lines().At(0).Start
 			}
 
-			directive, ok := ParseDirective(content, offset, t.Registry)
+			directive, ok := ParseDirective(content, offset)
 			if !ok {
 				break
 			}
@@ -117,34 +115,20 @@ func extractHTMLBlockContent(block *ast.HTMLBlock, source []byte) []byte {
 	return buf.Bytes()
 }
 
-//NOTE: The extension part with inside the registration of the keyword is a bit "meh"
-// extension is 100% neeeded because it tells goldmark to use our custome node
-// but the register keyword there it looks a bit weird at first
-// TODO: evaluate if it's a good solution or there are better approach
+// MakeDoExtension is a goldmark extension that transforms code blocks with
+// directive comments into MakeDoCodeBlock nodes.
+type MakeDoExtension struct{}
 
-type MakeDoExtension struct {
-	Registry *Registry
-}
-
+// NewMakeDoExtension creates a new MakeDoExtension.
+// Directive keywords are defined statically in directive_kind.go.
 func NewMakeDoExtension() *MakeDoExtension {
-	r := NewRegistry()
-	r.Register("out")
-	r.Register("cmd")
-	return &MakeDoExtension{Registry: r}
-}
-
-func NewMakeDoExtensionWithKeywords(keywords ...string) *MakeDoExtension {
-	r := NewRegistry()
-	for _, k := range keywords {
-		r.Register(k)
-	}
-	return &MakeDoExtension{Registry: r}
+	return &MakeDoExtension{}
 }
 
 func (e *MakeDoExtension) Extend(m goldmark.Markdown) {
 	m.Parser().AddOptions(
 		parser.WithASTTransformers(
-			util.Prioritized(&MakeDoTransformer{Registry: e.Registry}, 100),
+			util.Prioritized(&MakeDoTransformer{}, 100),
 		),
 	)
 }

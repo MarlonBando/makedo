@@ -11,17 +11,12 @@ var (
 	commentEnd   = []byte("-->")
 )
 
-// Directive represents a parsed comment directive (e.g., "out hello world").
-// It stores text.Segment references for zero-copy access to source.
+// Directive represents a parsed comment directive (e.g., "<!-- out hello world -->").
+// It stores the resolved DirectiveKind and a text.Segment reference for zero-copy
+// access to the content.
 type Directive struct {
-	Keyword text.Segment
-	Content text.Segment
-}
-
-// KeywordString returns the keyword as a string.
-// Only allocates when called.
-func (d *Directive) KeywordString(source []byte) string {
-	return string(d.Keyword.Value(source))
+	Kind    DirectiveKind // The resolved directive type
+	Content text.Segment  // Byte range for content in source (zero-copy)
 }
 
 // ContentString returns the content as a string.
@@ -38,10 +33,10 @@ func (d *Directive) ContentBytes(source []byte) []byte {
 // ParseDirective parses an HTML comment into a Directive.
 // Returns nil, false if:
 //   - Not a valid HTML comment (<!-- ... -->)
-//   - Keyword is not registered in the registry
+//   - Keyword is not a recognized directive
 //
 // Format: <!-- keyword content -->
-func ParseDirective(data []byte, start int, registry *Registry) (*Directive, bool) {
+func ParseDirective(data []byte, start int) (*Directive, bool) {
 	data = bytes.TrimSpace(data)
 
 	// Check comment markers
@@ -71,27 +66,24 @@ func ParseDirective(data []byte, start int, registry *Registry) (*Directive, boo
 		content = bytes.TrimSpace(inner[keywordEnd+1:])
 	}
 
-	// Check if keyword is registered
-	if !registry.IsValid(string(keyword)) {
+	// Parse keyword into DirectiveKind
+	kind := ParseDirectiveKind(keyword)
+	if kind == DirectiveUnknown {
 		return nil, false
 	}
 
-	// Calculate segment offsets relative to start
-	// start is the offset where 'data' begins in source
-	prefixLen := len(commentStart)
-	leadingSpaces := countLeadingSpaces(data[prefixLen:])
-
-	keywordStart := start + prefixLen + leadingSpaces
-	keywordSeg := text.NewSegment(keywordStart, keywordStart+len(keyword))
-
+	// Calculate content segment offset relative to start
 	var contentSeg text.Segment
 	if content != nil {
-		contentStart := keywordStart + len(keyword) + 1 + countLeadingSpaces(inner[keywordEnd+1:])
+		prefixLen := len(commentStart)
+		leadingSpaces := countLeadingSpaces(data[prefixLen:])
+		keywordStart := prefixLen + leadingSpaces
+		contentStart := start + keywordStart + len(keyword) + 1 + countLeadingSpaces(inner[keywordEnd+1:])
 		contentSeg = text.NewSegment(contentStart, contentStart+len(content))
 	}
 
 	return &Directive{
-		Keyword: keywordSeg,
+		Kind:    kind,
 		Content: contentSeg,
 	}, true
 }

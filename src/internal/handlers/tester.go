@@ -43,7 +43,7 @@ func execBlock(block *nodes.MakeDoCodeBlock, source []byte) blockResult {
 }
 
 func out(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
-	directive := block.GetDirective("out", source)
+	directive := block.GetDirective(nodes.DirectiveOut)
 	if directive == nil {
 		return nil
 	}
@@ -82,7 +82,7 @@ func out(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine 
 }
 
 func cmd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
-	directive := block.GetDirective("cmd", source)
+	directive := block.GetDirective(nodes.DirectiveCmd)
 	if directive == nil {
 		return nil
 	}
@@ -154,12 +154,11 @@ func VerifyMarkdown(mdPath string) error {
 
 		for _, directive := range directives {
 			var result *TestResult
-			keyword := directive.KeywordString(source)
 
-			switch keyword {
-			case "out":
+			switch directive.Kind {
+			case nodes.DirectiveOut:
 				result = out(block, source, br, startLine)
-			case "cmd":
+			case nodes.DirectiveCmd:
 				result = cmd(block, source, br, startLine)
 			}
 

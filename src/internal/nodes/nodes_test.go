@@ -8,63 +8,82 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-func TestRegistry(t *testing.T) {
-	r := NewRegistry()
-
-	// Empty registry
-	if r.IsValid("out") {
-		t.Error("expected 'out' to be invalid in empty registry")
+func TestDirectiveKind(t *testing.T) {
+	// Test ParseDirectiveKind
+	tests := []struct {
+		keyword []byte
+		want    DirectiveKind
+	}{
+		{[]byte("out"), DirectiveOut},
+		{[]byte("cmd"), DirectiveCmd},
+		{[]byte("unknown"), DirectiveUnknown},
+		{[]byte(""), DirectiveUnknown},
 	}
 
-	// Register keyword
-	r.Register("out")
-	if !r.IsValid("out") {
-		t.Error("expected 'out' to be valid after registration")
-	}
-	if r.IsValid("skip") {
-		t.Error("expected 'skip' to be invalid")
+	for _, tc := range tests {
+		got := ParseDirectiveKind(tc.keyword)
+		if got != tc.want {
+			t.Errorf("ParseDirectiveKind(%q) = %v, want %v", tc.keyword, got, tc.want)
+		}
 	}
 
-	// Register multiple
-	r.Register("skip")
-	r.Register("config")
-	keywords := r.Keywords()
-	if len(keywords) != 3 {
-		t.Errorf("expected 3 keywords, got %d", len(keywords))
+	// Test IsValidKeyword
+	if !IsValidKeyword([]byte("out")) {
+		t.Error("expected 'out' to be valid")
+	}
+	if !IsValidKeyword([]byte("cmd")) {
+		t.Error("expected 'cmd' to be valid")
+	}
+	if IsValidKeyword([]byte("unknown")) {
+		t.Error("expected 'unknown' to be invalid")
+	}
+
+	// Test String()
+	if DirectiveOut.String() != "out" {
+		t.Errorf("DirectiveOut.String() = %q, want %q", DirectiveOut.String(), "out")
+	}
+	if DirectiveCmd.String() != "cmd" {
+		t.Errorf("DirectiveCmd.String() = %q, want %q", DirectiveCmd.String(), "cmd")
+	}
+	if DirectiveUnknown.String() != "unknown" {
+		t.Errorf("DirectiveUnknown.String() = %q, want %q", DirectiveUnknown.String(), "unknown")
 	}
 }
 
 func TestParseDirective(t *testing.T) {
-	r := NewRegistry()
-	r.Register("out")
-	r.Register("skip")
-
 	tests := []struct {
 		name    string
 		input   string
 		wantOK  bool
-		keyword string
+		kind    DirectiveKind
 		content string
 	}{
 		{
 			name:    "valid directive with content",
 			input:   "<!-- out hello world -->",
 			wantOK:  true,
-			keyword: "out",
+			kind:    DirectiveOut,
 			content: "hello world",
 		},
 		{
 			name:    "valid directive without content",
-			input:   "<!-- skip -->",
+			input:   "<!-- out -->",
 			wantOK:  true,
-			keyword: "skip",
+			kind:    DirectiveOut,
 			content: "",
+		},
+		{
+			name:    "valid cmd directive",
+			input:   "<!-- cmd ls -la -->",
+			wantOK:  true,
+			kind:    DirectiveCmd,
+			content: "ls -la",
 		},
 		{
 			name:    "valid directive with extra whitespace",
 			input:   "<!--   out   hello   -->",
 			wantOK:  true,
-			keyword: "out",
+			kind:    DirectiveOut,
 			content: "hello",
 		},
 		{
@@ -97,7 +116,7 @@ func TestParseDirective(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			source := []byte(tc.input)
-			d, ok := ParseDirective(source, 0, r)
+			d, ok := ParseDirective(source, 0)
 
 			if ok != tc.wantOK {
 				t.Errorf("ParseDirective() ok = %v, want %v", ok, tc.wantOK)
@@ -108,9 +127,8 @@ func TestParseDirective(t *testing.T) {
 				return
 			}
 
-			gotKeyword := d.KeywordString(source)
-			if gotKeyword != tc.keyword {
-				t.Errorf("keyword = %q, want %q", gotKeyword, tc.keyword)
+			if d.Kind != tc.kind {
+				t.Errorf("kind = %v, want %v", d.Kind, tc.kind)
 			}
 
 			gotContent := d.ContentString(source)
@@ -123,18 +141,25 @@ func TestParseDirective(t *testing.T) {
 
 func TestMakeDoTransformer(t *testing.T) {
 	tests := []struct {
-		name          string
-		markdown      string
-		wantMakeDo    int // Number of MakeDoCodeBlock nodes expected
-		wantFenced    int // Number of FencedCodeBlock nodes expected
-		wantDirective string
+		name       string
+		markdown   string
+		wantMakeDo int // Number of MakeDoCodeBlock nodes expected
+		wantFenced int // Number of FencedCodeBlock nodes expected
+		wantKind   DirectiveKind
 	}{
 		{
-			name:          "code block with out directive",
-			markdown:      "```bash\necho hello\n```\n<!-- out hello -->",
-			wantMakeDo:    1,
-			wantFenced:    0,
-			wantDirective: "out",
+			name:       "code block with out directive",
+			markdown:   "```bash\necho hello\n```\n<!-- out hello -->",
+			wantMakeDo: 1,
+			wantFenced: 0,
+			wantKind:   DirectiveOut,
+		},
+		{
+			name:       "code block with cmd directive",
+			markdown:   "```bash\necho hello\n```\n<!-- cmd ls -->",
+			wantMakeDo: 1,
+			wantFenced: 0,
+			wantKind:   DirectiveCmd,
 		},
 		{
 			name:       "code block without directive",
@@ -172,7 +197,7 @@ func TestMakeDoTransformer(t *testing.T) {
 			doc := md.Parser().Parse(reader)
 
 			var makeDoCount, fencedCount int
-			var foundDirective string
+			var foundKind DirectiveKind
 
 			_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 				if !entering {
@@ -183,7 +208,7 @@ func TestMakeDoTransformer(t *testing.T) {
 					makeDoCount++
 					block := n.(*MakeDoCodeBlock)
 					if len(block.Directives()) > 0 {
-						foundDirective = block.Directives()[0].KeywordString(source)
+						foundKind = block.Directives()[0].Kind
 					}
 				case ast.KindFencedCodeBlock:
 					fencedCount++
@@ -197,8 +222,8 @@ func TestMakeDoTransformer(t *testing.T) {
 			if fencedCount != tc.wantFenced {
 				t.Errorf("FencedCodeBlock count = %d, want %d", fencedCount, tc.wantFenced)
 			}
-			if tc.wantDirective != "" && foundDirective != tc.wantDirective {
-				t.Errorf("directive = %q, want %q", foundDirective, tc.wantDirective)
+			if tc.wantKind != DirectiveUnknown && foundKind != tc.wantKind {
+				t.Errorf("directive kind = %v, want %v", foundKind, tc.wantKind)
 			}
 		})
 	}
@@ -247,17 +272,17 @@ func TestMakeDoCodeBlock(t *testing.T) {
 	}
 
 	// Test HasDirective
-	if !block.HasDirective("out", source) {
-		t.Error("HasDirective('out') = false, want true")
+	if !block.HasDirective(DirectiveOut) {
+		t.Error("HasDirective(DirectiveOut) = false, want true")
 	}
-	if block.HasDirective("skip", source) {
-		t.Error("HasDirective('skip') = true, want false")
+	if block.HasDirective(DirectiveCmd) {
+		t.Error("HasDirective(DirectiveCmd) = true, want false")
 	}
 
 	// Test GetDirective
-	d := block.GetDirective("out", source)
+	d := block.GetDirective(DirectiveOut)
 	if d == nil {
-		t.Fatal("GetDirective('out') returned nil")
+		t.Fatal("GetDirective(DirectiveOut) returned nil")
 	}
 	if d.ContentString(source) != "hello" {
 		t.Errorf("directive content = %q, want %q", d.ContentString(source), "hello")
@@ -266,19 +291,5 @@ func TestMakeDoCodeBlock(t *testing.T) {
 	// Test IsRaw
 	if !block.IsRaw() {
 		t.Error("IsRaw() = false, want true")
-	}
-}
-
-func TestNewMakeDoExtensionWithKeywords(t *testing.T) {
-	ext := NewMakeDoExtensionWithKeywords("custom", "skip", "expect")
-
-	if !ext.Registry.IsValid("custom") {
-		t.Error("expected 'custom' to be valid")
-	}
-	if !ext.Registry.IsValid("skip") {
-		t.Error("expected 'skip' to be valid")
-	}
-	if ext.Registry.IsValid("out") {
-		t.Error("expected 'out' to be invalid (not registered)")
 	}
 }

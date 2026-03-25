@@ -90,20 +90,20 @@ func (n *MakeDoCodeBlock) AddDirective(d *Directive) {
 	n.directives = append(n.directives, d)
 }
 
-// HasDirective checks if a directive with the given keyword exists.
-func (n *MakeDoCodeBlock) HasDirective(keyword string, source []byte) bool {
+// HasDirective checks if a directive with the given kind exists.
+func (n *MakeDoCodeBlock) HasDirective(kind DirectiveKind) bool {
 	for _, d := range n.directives {
-		if d.KeywordString(source) == keyword {
+		if d.Kind == kind {
 			return true
 		}
 	}
 	return false
 }
 
-// GetDirective returns the first directive with the given keyword.
-func (n *MakeDoCodeBlock) GetDirective(keyword string, source []byte) *Directive {
+// GetDirective returns the first directive with the given kind.
+func (n *MakeDoCodeBlock) GetDirective(kind DirectiveKind) *Directive {
 	for _, d := range n.directives {
-		if d.KeywordString(source) == keyword {
+		if d.Kind == kind {
 			return d
 		}
 	}
