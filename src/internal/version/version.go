@@ -1,7 +1,24 @@
 package version
 
-var Version = "dev"
+import (
+	"os"
+	"strings"
+)
+
+var embeddedVersion string
+
+func SetVersion(version string) {
+	embeddedVersion = version
+}
 
 func Get() string {
-	return Version
+	if embeddedVersion != "" {
+		return strings.TrimSpace(embeddedVersion)
+	}
+
+	data, err := os.ReadFile("VERSION")
+	if err != nil {
+		return "dev"
+	}
+	return strings.TrimSpace(string(data))
 }

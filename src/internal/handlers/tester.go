@@ -112,6 +112,81 @@ func cmd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine 
 	}
 }
 
+func normalizePath(p string) string {
+	p = strings.ReplaceAll(p, "\\", "/")
+	if len(p) > 1 && p[len(p)-1] == '/' {
+		p = p[:len(p)-1]
+	}
+	return p
+}
+
+func matchGlob(path, pattern string) (bool, error) {
+	starCount := strings.Count(pattern, "*")
+
+	if starCount > 1 {
+		return false, fmt.Errorf("pwd directive only allows a single wildcard (*) at the start or end of the pattern, got: %q", pattern)
+	}
+
+	if starCount == 1 {
+		if strings.HasPrefix(pattern, "*") {
+			return strings.HasSuffix(path, strings.TrimPrefix(pattern, "*")), nil
+		}
+		if strings.HasSuffix(pattern, "*") {
+			return strings.HasPrefix(path, strings.TrimSuffix(pattern, "*")), nil
+		}
+
+		// * is in the middle
+		return false, fmt.Errorf("pwd directive only allows a wildcard (*) at the start or end of the pattern, got: %q", pattern)
+	}
+
+	// Default: match suffix
+	return strings.HasSuffix(path, pattern), nil
+}
+
+func pwd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
+	directive := block.GetDirective(nodes.DirectivePwd)
+	if directive == nil {
+		return nil
+	}
+
+	pattern := strings.TrimSpace(directive.ContentString(source))
+
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return &TestResult{
+			Passed:    false,
+			StartLine: startLine,
+			Expected:  pattern,
+			Actual:    "",
+			Error:     fmt.Errorf("failed to get working directory: %w", err),
+		}
+	}
+
+	// Normalize both pattern and cwd
+	cwd = normalizePath(cwd)
+	pattern = normalizePath(pattern)
+
+	// Match using glob rules
+	matched, err := matchGlob(cwd, pattern)
+	if err != nil {
+		return &TestResult{
+			Passed:    false,
+			StartLine: startLine,
+			Expected:  pattern,
+			Actual:    "",
+			Error:     err,
+		}
+	}
+
+	return &TestResult{
+		Passed:    matched,
+		StartLine: startLine,
+		Expected:  pattern,
+		Actual:    cwd,
+	}
+}
+
 func VerifyMarkdown(mdPath string) error {
 	mdPath = strings.TrimSpace(mdPath)
 
@@ -160,6 +235,8 @@ func VerifyMarkdown(mdPath string) error {
 				result = out(block, source, br, startLine)
 			case nodes.DirectiveCmd:
 				result = cmd(block, source, br, startLine)
+			case nodes.DirectivePwd:
+				result = pwd(block, source, br, startLine)
 			}
 
 			if result == nil {

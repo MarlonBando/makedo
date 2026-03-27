@@ -6,6 +6,7 @@ const (
 	DirectiveUnknown DirectiveKind = iota
 	DirectiveOut
 	DirectiveCmd
+	DirectivePwd
 )
 
 // For fewer keywords probably a slice would be faster
@@ -15,6 +16,7 @@ const (
 var directiveKeywords = map[string]DirectiveKind{
 	"out": DirectiveOut,
 	"cmd": DirectiveCmd,
+	"pwd": DirectivePwd,
 }
 
 // ParseDirectiveKind returns the DirectiveKind for a keyword.
@@ -41,6 +43,8 @@ func (k DirectiveKind) String() string {
 		return "out"
 	case DirectiveCmd:
 		return "cmd"
+	case DirectivePwd:
+		return "pwd"
 	default:
 		return "unknown"
 	}

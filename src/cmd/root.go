@@ -8,14 +8,22 @@ import (
 	"makedo/internal/version"
 )
 
-//TODO: add version flag where we get only the version in return
+var showVersion bool
 
 var rootCmd = &cobra.Command{
 	Use:   "makedo",
 	Short: "A markdown-based task runner",
 	Run: func(cmd *cobra.Command, args []string) {
+		if showVersion {
+			fmt.Println(version.Get())
+			return
+		}
 		fmt.Println(version.Get())
 	},
+}
+
+func init() {
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Print version")
 }
 
 func Execute() {
