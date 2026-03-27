@@ -5,6 +5,7 @@ type DirectiveKind uint8
 const (
 	DirectiveUnknown DirectiveKind = iota
 	DirectiveOut
+	DirectiveOutRegex
 	DirectiveCmd
 	DirectivePwd
 )
@@ -14,9 +15,10 @@ const (
 // and doesn't make any difference to the user so
 // map makes code cleaner
 var directiveKeywords = map[string]DirectiveKind{
-	"out": DirectiveOut,
-	"cmd": DirectiveCmd,
-	"pwd": DirectivePwd,
+	"out":  DirectiveOut,
+	"outr": DirectiveOutRegex,
+	"cmd":  DirectiveCmd,
+	"pwd":  DirectivePwd,
 }
 
 // ParseDirectiveKind returns the DirectiveKind for a keyword.
@@ -41,6 +43,8 @@ func (k DirectiveKind) String() string {
 	switch k {
 	case DirectiveOut:
 		return "out"
+	case DirectiveOutRegex:
+		return "outr"
 	case DirectiveCmd:
 		return "cmd"
 	case DirectivePwd:

@@ -34,16 +34,43 @@ func lineNumber(source []byte, offset int) int {
 	return bytes.Count(source[:offset], []byte{'\n'}) + 1
 }
 
-// execBlock executes a code block and returns the output and error
 func execBlock(block *nodes.MakeDoCodeBlock, source []byte) blockResult {
 	code := block.Code(source)
 	cmd := exec.Command(os.Getenv("SHELL"), "-c", string(code))
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	return blockResult{output: output, err: err}
 }
 
 func out(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
 	directive := block.GetDirective(nodes.DirectiveOut)
+	if directive == nil {
+		return nil
+	}
+
+	expected := strings.TrimSpace(directive.ContentString(source))
+
+	if br.err != nil {
+		return &TestResult{
+			Passed:    false,
+			StartLine: startLine,
+			Expected:  expected,
+			Actual:    string(br.output),
+			Error:     br.err,
+		}
+	}
+
+	actual := strings.TrimRight(string(br.output), "\n")
+
+	return &TestResult{
+		Passed:    strings.Contains(actual, expected),
+		StartLine: startLine,
+		Expected:  expected,
+		Actual:    actual,
+	}
+}
+
+func outr(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
+	directive := block.GetDirective(nodes.DirectiveOutRegex)
 	if directive == nil {
 		return nil
 	}
@@ -81,6 +108,7 @@ func out(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine 
 	}
 }
 
+// TODO: think how to use go routines to support background command like running a server.
 func cmd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
 	directive := block.GetDirective(nodes.DirectiveCmd)
 	if directive == nil {
@@ -233,6 +261,8 @@ func VerifyMarkdown(mdPath string) error {
 			switch directive.Kind {
 			case nodes.DirectiveOut:
 				result = out(block, source, br, startLine)
+			case nodes.DirectiveOutRegex:
+				result = outr(block, source, br, startLine)
 			case nodes.DirectiveCmd:
 				result = cmd(block, source, br, startLine)
 			case nodes.DirectivePwd:
