@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -118,9 +119,11 @@ func (ctx *renderContext) handleFencedCodeBlock(codeNode *ast.FencedCodeBlock) (
 
 func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte) (ast.WalkStatus, error) {
 	lines := node.Lines()
-	start, end := lines.At(0).Start-1, lines.At(lines.Len()-1).Stop+1
+	contentStart := lines.At(0).Start
+	start := bytes.LastIndexByte(ctx.source[:contentStart-1], '\n') + 1
+	lastLineEnd := lines.At(lines.Len() - 1).Stop
+	end := lastLineEnd + bytes.IndexByte(ctx.source[lastLineEnd:], '\n') + 1
 
-	// Render markdown content before this code block
 	if ctx.lastPos < start {
 		section := ctx.source[ctx.lastPos:start]
 		if len(strings.TrimSpace(string(section))) > 0 {
@@ -160,7 +163,6 @@ func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte) (ast.WalkS
 		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] exit code %s", exitCode)))
 	}
 
-	// Update position tracker
 	ctx.lastPos = end
 
 	return ast.WalkContinue, nil
