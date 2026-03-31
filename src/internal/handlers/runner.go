@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
+	"makedo/internal/executor"
 	"makedo/internal/nodes"
 
 	"github.com/charmbracelet/glamour"
@@ -35,6 +35,7 @@ type renderContext struct {
 	source          []byte
 	glamourRenderer *glamour.TermRenderer
 	lastPos         int
+	registry        *executor.Registry
 }
 
 func RunMarkdownFile(mdFile string) error {
@@ -45,17 +46,19 @@ func RunMarkdownFile(mdFile string) error {
 		return err
 	}
 
+	// Process registry for cleanup at document end
+	registry := executor.NewRegistry()
+	defer registry.KillAll()
+
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithStyles(getNoIndentStyle()),
 		glamour.WithWordWrap(0),
 	)
-
 	if err != nil {
 		return err
 	}
 
 	md := goldmark.New(
-
 		goldmark.WithExtensions(
 			nodes.NewMakeDoExtension(),
 		),
@@ -67,6 +70,7 @@ func RunMarkdownFile(mdFile string) error {
 		source:          source,
 		glamourRenderer: renderer,
 		lastPos:         0,
+		registry:        registry,
 	}
 
 	// Walk AST and render/execute sequentially
@@ -105,7 +109,7 @@ func RunMarkdownFile(mdFile string) error {
 }
 
 func (ctx *renderContext) handleMakeDoCodeBlock(block *nodes.MakeDoCodeBlock) (ast.WalkStatus, error) {
-	return ctx.handleCodeBlock(block, block.Code(ctx.source))
+	return ctx.handleCodeBlock(block, block.Code(ctx.source), block.Directives())
 }
 
 func (ctx *renderContext) handleFencedCodeBlock(codeNode *ast.FencedCodeBlock) (ast.WalkStatus, error) {
@@ -114,10 +118,10 @@ func (ctx *renderContext) handleFencedCodeBlock(codeNode *ast.FencedCodeBlock) (
 		line := codeNode.Lines().At(i)
 		code.Write(line.Value(ctx.source))
 	}
-	return ctx.handleCodeBlock(codeNode, []byte(code.String()))
+	return ctx.handleCodeBlock(codeNode, []byte(code.String()), nil)
 }
 
-func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte) (ast.WalkStatus, error) {
+func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives []*nodes.Directive) (ast.WalkStatus, error) {
 	lines := node.Lines()
 	contentStart := lines.At(0).Start
 	start := bytes.LastIndexByte(ctx.source[:contentStart-1], '\n') + 1
@@ -146,21 +150,20 @@ func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte) (ast.WalkS
 	// Execute with streaming output
 	fmt.Println("---")
 
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", string(code))
-	cmd.Stdout = os.Stdout // Stream directly
-	cmd.Stderr = os.Stderr // Stream directly
-
-	execErr := cmd.Run()
+	result := executor.Execute(string(code), directives, ctx.source, true)
 
 	fmt.Println("---")
 
-	// Print error message if execution failed
-	if execErr != nil {
-		exitCode := "unknown"
-		if exitErr, ok := execErr.(*exec.ExitError); ok {
-			exitCode = fmt.Sprintf("%d", exitErr.ExitCode())
-		}
-		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] exit code %s", exitCode)))
+	// Register process for cleanup if still running
+	if result.Process != nil && result.Status != executor.Completed {
+		ctx.registry.Add(result.Process)
+	}
+
+	// Print error/status message
+	if result.Err != nil {
+		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] %v", result.Err)))
+	} else if result.ExitCode > 0 {
+		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] exit code %d", result.ExitCode)))
 	}
 
 	ctx.lastPos = end

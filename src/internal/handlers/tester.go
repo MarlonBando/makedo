@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 
+	"makedo/internal/executor"
 	"makedo/internal/nodes"
 
 	"github.com/yuin/goldmark"
@@ -15,6 +14,7 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
+// TestResult holds the result of a single directive test for reporting.
 type TestResult struct {
 	Passed    bool
 	StartLine int
@@ -23,195 +23,42 @@ type TestResult struct {
 	Error     error
 }
 
-// blockResult holds the result of executing a code block
-type blockResult struct {
-	output []byte
-	err    error
-}
-
 // lineNumber converts a byte offset to a 1-indexed line number
 func lineNumber(source []byte, offset int) int {
 	return bytes.Count(source[:offset], []byte{'\n'}) + 1
 }
 
-func execBlock(block *nodes.MakeDoCodeBlock, source []byte) blockResult {
-	code := block.Code(source)
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", string(code))
-	output, err := cmd.CombinedOutput()
-	return blockResult{output: output, err: err}
-}
-
-func out(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
-	directive := block.GetDirective(nodes.DirectiveOut)
-	if directive == nil {
-		return nil
-	}
-
-	expected := strings.TrimSpace(directive.ContentString(source))
-
-	if br.err != nil {
+// testDirective tests a single directive against execution result
+func testDirective(d *nodes.Directive, execResult *executor.Result, source []byte, startLine int) *TestResult {
+	// Handle non-zero exit for completed commands
+	if execResult.Status == executor.Completed && execResult.ExitCode != 0 {
 		return &TestResult{
 			Passed:    false,
 			StartLine: startLine,
-			Expected:  expected,
-			Actual:    string(br.output),
-			Error:     br.err,
+			Expected:  "command to succeed",
+			Actual:    string(execResult.Output),
+			Error:     fmt.Errorf("command exited with code %d", execResult.ExitCode),
 		}
 	}
 
-	actual := strings.TrimRight(string(br.output), "\n")
+	// If executor returned Ready, cmd directives already passed during execution
+	if d.Kind == nodes.DirectiveCmd && execResult.Status == executor.Ready {
+		return &TestResult{
+			Passed:    true,
+			StartLine: startLine,
+			Expected:  "exit 0",
+			Actual:    d.ContentString(source),
+		}
+	}
 
+	// Use shared directive checking
+	check := executor.CheckDirective(execResult.Output, d, source)
 	return &TestResult{
-		Passed:    strings.Contains(actual, expected),
+		Passed:    check.Passed,
 		StartLine: startLine,
-		Expected:  expected,
-		Actual:    actual,
-	}
-}
-
-func outr(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
-	directive := block.GetDirective(nodes.DirectiveOutRegex)
-	if directive == nil {
-		return nil
-	}
-
-	expected := directive.ContentString(source)
-
-	if br.err != nil {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  expected,
-			Actual:    string(br.output),
-			Error:     br.err,
-		}
-	}
-
-	actual := strings.TrimRight(string(br.output), "\n")
-
-	re, err := regexp.Compile(expected)
-	if err != nil {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  expected,
-			Actual:    actual,
-			Error:     fmt.Errorf("invalid regex '%s': %w", expected, err),
-		}
-	}
-
-	return &TestResult{
-		Passed:    re.MatchString(actual),
-		StartLine: startLine,
-		Expected:  expected,
-		Actual:    actual,
-	}
-}
-
-// TODO: think how to use go routines to support background command like running a server.
-func cmd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
-	directive := block.GetDirective(nodes.DirectiveCmd)
-	if directive == nil {
-		return nil
-	}
-
-	// Code block must succeed first
-	if br.err != nil {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  "code block to succeed",
-			Actual:    string(br.output),
-			Error:     br.err,
-		}
-	}
-
-	// Run verification command
-	command := directive.ContentString(source)
-	verifyCmd := exec.Command(os.Getenv("SHELL"), "-c", command)
-	err := verifyCmd.Run()
-
-	return &TestResult{
-		Passed:    err == nil,
-		StartLine: startLine,
-		Expected:  "exit 0",
-		Actual:    command,
-		Error:     err,
-	}
-}
-
-func normalizePath(p string) string {
-	p = strings.ReplaceAll(p, "\\", "/")
-	if len(p) > 1 && p[len(p)-1] == '/' {
-		p = p[:len(p)-1]
-	}
-	return p
-}
-
-func matchGlob(path, pattern string) (bool, error) {
-	starCount := strings.Count(pattern, "*")
-
-	if starCount > 1 {
-		return false, fmt.Errorf("pwd directive only allows a single wildcard (*) at the start or end of the pattern, got: %q", pattern)
-	}
-
-	if starCount == 1 {
-		if strings.HasPrefix(pattern, "*") {
-			return strings.HasSuffix(path, strings.TrimPrefix(pattern, "*")), nil
-		}
-		if strings.HasSuffix(pattern, "*") {
-			return strings.HasPrefix(path, strings.TrimSuffix(pattern, "*")), nil
-		}
-
-		// * is in the middle
-		return false, fmt.Errorf("pwd directive only allows a wildcard (*) at the start or end of the pattern, got: %q", pattern)
-	}
-
-	// Default: match suffix
-	return strings.HasSuffix(path, pattern), nil
-}
-
-func pwd(block *nodes.MakeDoCodeBlock, source []byte, br blockResult, startLine int) *TestResult {
-	directive := block.GetDirective(nodes.DirectivePwd)
-	if directive == nil {
-		return nil
-	}
-
-	pattern := strings.TrimSpace(directive.ContentString(source))
-
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  pattern,
-			Actual:    "",
-			Error:     fmt.Errorf("failed to get working directory: %w", err),
-		}
-	}
-
-	// Normalize both pattern and cwd
-	cwd = normalizePath(cwd)
-	pattern = normalizePath(pattern)
-
-	// Match using glob rules
-	matched, err := matchGlob(cwd, pattern)
-	if err != nil {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  pattern,
-			Actual:    "",
-			Error:     err,
-		}
-	}
-
-	return &TestResult{
-		Passed:    matched,
-		StartLine: startLine,
-		Expected:  pattern,
-		Actual:    cwd,
+		Expected:  check.Expected,
+		Actual:    check.Actual,
+		Error:     check.Err,
 	}
 }
 
@@ -222,6 +69,10 @@ func VerifyMarkdown(mdPath string) error {
 	if err != nil {
 		return err
 	}
+
+	// Process registry for cleanup at document end
+	registry := executor.NewRegistry()
+	defer registry.KillAll()
 
 	md := goldmark.New(
 		goldmark.WithExtensions(nodes.NewMakeDoExtension()),
@@ -243,32 +94,42 @@ func VerifyMarkdown(mdPath string) error {
 		}
 
 		block := n.(*nodes.MakeDoCodeBlock)
-
-		// Execute block once
-		lines := block.Lines()
-		startLine := lineNumber(source, lines.At(0).Start)
-		br := execBlock(block, source)
-
-		// Process all directives on this block
 		directives := block.Directives()
+
+		// Skip blocks without directives
 		if len(directives) == 0 {
 			return ast.WalkContinue, nil
 		}
 
+		lines := block.Lines()
+		startLine := lineNumber(source, lines.At(0).Start)
+
+		// Execute block using executor
+		code := block.Code(source)
+		execResult := executor.Execute(string(code), directives, source, false)
+
+		// Register process for cleanup if still running
+		if execResult.Process != nil && execResult.Status != executor.Completed {
+			registry.Add(execResult.Process)
+		}
+
+		// Handle stall: with directives = fail
+		if execResult.Status == executor.Stalled {
+			testNum++
+			fmt.Printf("test %d... failed (stalled)\n", testNum)
+			results = append(results, &TestResult{
+				Passed:    false,
+				StartLine: startLine,
+				Expected:  "directives to pass before stall timeout",
+				Actual:    "no output for 10s",
+				Error:     fmt.Errorf("command stalled"),
+			})
+			return ast.WalkContinue, nil
+		}
+
+		// Test each directive for reporting
 		for _, directive := range directives {
-			var result *TestResult
-
-			switch directive.Kind {
-			case nodes.DirectiveOut:
-				result = out(block, source, br, startLine)
-			case nodes.DirectiveOutRegex:
-				result = outr(block, source, br, startLine)
-			case nodes.DirectiveCmd:
-				result = cmd(block, source, br, startLine)
-			case nodes.DirectivePwd:
-				result = pwd(block, source, br, startLine)
-			}
-
+			result := testDirective(directive, execResult, source, startLine)
 			if result == nil {
 				continue
 			}
