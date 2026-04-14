@@ -106,9 +106,37 @@ func EmbedMarkdownFile(mdFile string) error {
 			registry.Add(result.Process)
 		}
 
-		if result.Err != nil || result.ExitCode > 0 {
-			lineNum := bytes.Count(source[:block.Lines().At(0).Start], []byte("\n")) + 1
-			fmt.Println(warnStyle.Render(fmt.Sprintf("[WARN] Block at line %d failed, skipping output update", lineNum)))
+		lineNum := lineNumber(source, block.Lines().At(0).Start)
+
+		blockFailed := false
+		var failReason string
+
+		if result.Err != nil {
+			blockFailed = true
+			failReason = result.Err.Error()
+		} else if result.Status == executor.Completed && result.ExitCode > 0 {
+			blockFailed = true
+			failReason = fmt.Sprintf("exit code %d", result.ExitCode)
+		} else if result.Status == executor.Stalled && len(directives) > 0 {
+			blockFailed = true
+			failReason = "command stalled before directives passed"
+		} else {
+			for _, d := range directives {
+				testRes := testDirective(d, result, source, lineNum)
+				if testRes != nil && !testRes.Passed {
+					blockFailed = true
+					if testRes.Error != nil {
+						failReason = testRes.Error.Error()
+					} else {
+						failReason = fmt.Sprintf("directive '%s' failed to match", string(d.Kind))
+					}
+					break
+				}
+			}
+		}
+
+		if blockFailed {
+			fmt.Println(warnStyle.Render(fmt.Sprintf("[WARN] Block at line %d failed (%s), skipping output update", lineNum, failReason)))
 			failed++
 
 			// Keep existing output block if present
