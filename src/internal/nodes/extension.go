@@ -12,9 +12,10 @@ import (
 
 // transformation holds data for a pending AST transformation.
 type transformation struct {
-	codeBlock  *ast.FencedCodeBlock
-	htmlBlocks []*ast.HTMLBlock
-	directives []*Directive
+	codeBlock   *ast.FencedCodeBlock
+	htmlBlocks  []*ast.HTMLBlock
+	directives  []*Directive
+	outputBlock *ast.FencedCodeBlock
 }
 
 type MakeDoTransformer struct{}
@@ -40,9 +41,10 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 
 		var directives []*Directive
 		var htmlBlocks []*ast.HTMLBlock
+		var next ast.Node
 
 		// Collect consecutive HTML blocks that are valid directives
-		for next := codeBlock.NextSibling(); next != nil; next = next.NextSibling() {
+		for next = codeBlock.NextSibling(); next != nil; next = next.NextSibling() {
 			htmlBlock, ok := next.(*ast.HTMLBlock)
 			if !ok {
 				break
@@ -71,10 +73,21 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 			return ast.WalkContinue, nil
 		}
 
+		var outputBlock *ast.FencedCodeBlock
+		if next != nil {
+			if fb, ok := next.(*ast.FencedCodeBlock); ok {
+				lang := fb.Language(source)
+				if bytes.Equal(lang, []byte("stdout")) {
+					outputBlock = fb
+				}
+			}
+		}
+
 		transformations = append(transformations, transformation{
-			codeBlock:  codeBlock,
-			htmlBlocks: htmlBlocks,
-			directives: directives,
+			codeBlock:   codeBlock,
+			htmlBlocks:  htmlBlocks,
+			directives:  directives,
+			outputBlock: outputBlock,
 		})
 
 		return ast.WalkContinue, nil
@@ -86,11 +99,17 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 		for _, d := range tr.directives {
 			makedo.AddDirective(d)
 		}
+		if tr.outputBlock != nil {
+			makedo.SetOutputBlock(tr.outputBlock)
+		}
 
 		parent := tr.codeBlock.Parent()
 		parent.ReplaceChild(parent, tr.codeBlock, makedo)
 		for _, htmlBlock := range tr.htmlBlocks {
 			parent.RemoveChild(parent, htmlBlock)
+		}
+		if tr.outputBlock != nil {
+			parent.RemoveChild(parent, tr.outputBlock)
 		}
 	}
 }

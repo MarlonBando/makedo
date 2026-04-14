@@ -14,9 +14,10 @@ var KindMakeDoCodeBlock = ast.NewNodeKind("MakeDoCodeBlock")
 // It combines a code block with parsed comment directives that follow it.
 type MakeDoCodeBlock struct {
 	ast.BaseBlock
-	language   []byte
-	info       *ast.Text
-	directives []*Directive
+	language    []byte
+	info        *ast.Text
+	directives  []*Directive
+	outputBlock *ast.FencedCodeBlock
 }
 
 // NewMakeDoCodeBlock creates a MakeDoCodeBlock from a FencedCodeBlock.
@@ -30,6 +31,16 @@ func NewMakeDoCodeBlock(codeBlock *ast.FencedCodeBlock) *MakeDoCodeBlock {
 	lines := codeBlock.Lines()
 	n.SetLines(lines)
 	return n
+}
+
+// OutputBlock returns the stdout output block associated with this code block, if any.
+func (n *MakeDoCodeBlock) OutputBlock() *ast.FencedCodeBlock {
+	return n.outputBlock
+}
+
+// SetOutputBlock sets the stdout output block associated with this code block.
+func (n *MakeDoCodeBlock) SetOutputBlock(b *ast.FencedCodeBlock) {
+	n.outputBlock = b
 }
 
 // Kind returns the NodeKind for MakeDoCodeBlock.
