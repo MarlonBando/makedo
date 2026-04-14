@@ -39,6 +39,13 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 			return ast.WalkContinue, nil
 		}
 
+		// Don't turn stdout blocks into MakeDoCodeBlocks.
+		// They are the output of previous MakeDoCodeBlocks.
+		lang := codeBlock.Language(source)
+		if bytes.Equal(lang, []byte("stdout")) {
+			return ast.WalkContinue, nil
+		}
+
 		var directives []*Directive
 		var htmlBlocks []*ast.HTMLBlock
 		var next ast.Node
@@ -67,10 +74,6 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 
 			directives = append(directives, directive)
 			htmlBlocks = append(htmlBlocks, htmlBlock)
-		}
-
-		if len(directives) == 0 {
-			return ast.WalkContinue, nil
 		}
 
 		var outputBlock *ast.FencedCodeBlock

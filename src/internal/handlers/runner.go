@@ -82,8 +82,6 @@ func RunMarkdownFile(mdFile string) error {
 		switch n.Kind() {
 		case nodes.KindMakeDoCodeBlock:
 			return ctx.handleMakeDoCodeBlock(n.(*nodes.MakeDoCodeBlock))
-		case ast.KindFencedCodeBlock:
-			return ctx.handleFencedCodeBlock(n.(*ast.FencedCodeBlock))
 		}
 
 		return ast.WalkContinue, nil
@@ -112,14 +110,6 @@ func (ctx *renderContext) handleMakeDoCodeBlock(block *nodes.MakeDoCodeBlock) (a
 	return ctx.handleCodeBlock(block, block.Code(ctx.source), block.Directives())
 }
 
-func (ctx *renderContext) handleFencedCodeBlock(codeNode *ast.FencedCodeBlock) (ast.WalkStatus, error) {
-	var code strings.Builder
-	for i := 0; i < codeNode.Lines().Len(); i++ {
-		line := codeNode.Lines().At(i)
-		code.Write(line.Value(ctx.source))
-	}
-	return ctx.handleCodeBlock(codeNode, []byte(code.String()), nil)
-}
 
 func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives []*nodes.Directive) (ast.WalkStatus, error) {
 	lines := node.Lines()
