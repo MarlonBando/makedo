@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"makedo/internal/executor"
@@ -29,7 +30,7 @@ func lineNumber(source []byte, offset int) int {
 }
 
 // testDirective tests a single directive against execution result
-func testDirective(d *nodes.Directive, execResult *executor.Result, source []byte, startLine int) *TestResult {
+func testDirective(d *nodes.Directive, execResult *executor.Result, source []byte, startLine int, patterns map[*nodes.Directive]*regexp.Regexp) *TestResult {
 	// Handle non-zero exit for completed commands
 	if execResult.Status == executor.Completed && execResult.ExitCode != 0 {
 		return &TestResult{
@@ -52,7 +53,7 @@ func testDirective(d *nodes.Directive, execResult *executor.Result, source []byt
 	}
 
 	// Use shared directive checking
-	check := executor.CheckDirective(execResult.Output, d, source)
+	check := executor.CheckDirective(execResult.Output, d, source, patterns)
 	return &TestResult{
 		Passed:    check.Passed,
 		StartLine: startLine,
@@ -106,6 +107,13 @@ func VerifyMarkdown(mdPath string) error {
 
 		// Execute block using executor
 		code := block.Code(source)
+
+		patterns, err := executor.PrecompileDirectives(directives, source)
+		if err != nil {
+			fmt.Printf("failed to precompile directives: %v\n", err)
+			return ast.WalkContinue, nil
+		}
+
 		execResult := executor.Execute(string(code), directives, source, false)
 
 		// Register process for cleanup if still running
@@ -129,7 +137,7 @@ func VerifyMarkdown(mdPath string) error {
 
 		// Test each directive for reporting
 		for _, directive := range directives {
-			result := testDirective(directive, execResult, source, startLine)
+			result := testDirective(directive, execResult, source, startLine, patterns)
 			if result == nil {
 				continue
 			}

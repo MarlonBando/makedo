@@ -99,6 +99,12 @@ func EmbedMarkdownFile(mdFile string) error {
 		// Write everything from lastPos to the end of the block
 		buf.Write(source[lastPos:blockEnd])
 
+		patterns, err := executor.PrecompileDirectives(directives, source)
+		if err != nil {
+			fmt.Println(warnStyle.Render(fmt.Sprintf("[WARN] Failed to precompile directives: %v", err)))
+			continue
+		}
+
 		code := string(block.Code(source))
 		result := executor.Execute(code, directives, source, false)
 
@@ -122,7 +128,7 @@ func EmbedMarkdownFile(mdFile string) error {
 			failReason = "command stalled before directives passed"
 		} else {
 			for _, d := range directives {
-				testRes := testDirective(d, result, source, lineNum)
+				testRes := testDirective(d, result, source, lineNum, patterns)
 				if testRes != nil && !testRes.Passed {
 					blockFailed = true
 					if testRes.Error != nil {

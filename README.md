@@ -36,3 +36,21 @@ At the moment we have the following directives:
 - outr [regex] -> check if stout contains [regex]
 - cmd  [content] -> run a command. If it succed the test is passed
 - pwd  [content] -> check if pwd print [content]
+
+### Dynamic Types in Directives
+Makedo supports testing dynamic output (like dates, UUIDs, or IP addresses) using a special `${{type}}` syntax. This allows you to match dynamic text without writing complex regular expressions.
+
+You can use these types in both `out` and `outr` directives:
+```bash
+echo "Created user 550e8400-e29b-41d4-a716-446655440000 on 2023-10-25"
+```
+<!-- out Created user ${{uuid}} on ${{date}} -->
+
+Available built-in types:
+- `${{date}}`: Matches YYYY-MM-DD
+- `${{time}}`: Matches HH:MM:SS
+- `${{uuid}}`: Matches a standard UUID
+- `${{ip}}`: Matches an IPv4 address
+- `${{number}}`: Matches any integer or decimal number
+
+When used inside an `out` directive, all other text is automatically escaped to ensure a literal match, preventing any regular expression syntax conflicts!

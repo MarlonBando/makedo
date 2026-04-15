@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"sync"
 	"syscall"
 	"time"
@@ -24,6 +25,11 @@ var StallTimeout = 10 * time.Second
 // Execute runs a command with goroutine-based output monitoring.
 // Returns when: command exits, all directives pass, or output stalls.
 func Execute(code string, directives []*nodes.Directive, source []byte, stream bool) *Result {
+	compiledPatterns, err := PrecompileDirectives(directives, source)
+	if err != nil {
+		return &Result{Err: err, ExitCode: -1}
+	}
+
 	cmd := exec.Command(os.Getenv("SHELL"), "-c", code)
 
 	// Set up process group so we can kill the entire tree
@@ -57,7 +63,7 @@ func Execute(code string, directives []*nodes.Directive, source []byte, stream b
 		close(output)
 	}()
 
-	result := monitor(cmd, output, done, directives, source, stream)
+	result := monitor(cmd, output, done, directives, source, stream, compiledPatterns)
 
 	// If process still running, it stays alive for registry to kill later
 	return result
@@ -65,7 +71,7 @@ func Execute(code string, directives []*nodes.Directive, source []byte, stream b
 
 // TODO: Improve efficiency. We run all the directives when checking. Maybe some directives already passed
 // so technically we shouldn't be checking them. But this is for later.
-func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives []*nodes.Directive, source []byte, stream bool) *Result {
+func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *Result {
 	var buf bytes.Buffer
 	lastActivity := time.Now()
 	ticker := time.NewTicker(TickerInterval)
@@ -76,7 +82,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 	// Immediate initial check of ALL directives (before any output)
 	// This handles cases where directives pass before command produces output
-	if hasDirectives && checkAllDirectives(buf.Bytes(), directives, source) {
+	if hasDirectives && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns) {
 		close(done)
 		return &Result{
 			Status:   Ready,
@@ -112,7 +118,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 			// Fast-track: check ONLY fast directives (out, outr, pwd) on output
 			// cmd directives are checked on ticker to avoid spawning too many processes
-			if hasDirectives && !needsCmdCheck && checkFastDirectives(buf.Bytes(), directives, source) {
+			if hasDirectives && !needsCmdCheck && checkFastDirectives(buf.Bytes(), directives, source, compiledPatterns) {
 				close(done)
 				return &Result{
 					Status:   Ready,
@@ -138,7 +144,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 			// Full directive check (includes cmd) on ticker
 			// Runs synchronously - only one cmd process at a time
-			if hasDirectives && checkAllDirectives(buf.Bytes(), directives, source) {
+			if hasDirectives && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns) {
 				close(done)
 				return &Result{
 					Status:   Ready,
