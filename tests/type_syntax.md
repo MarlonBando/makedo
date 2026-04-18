@@ -1,12 +1,24 @@
 # Type Syntax Test
 
+This is how you get the time in bash
 ```bash
-echo "Current Date: 2023-10-25"
+date +%T
 ```
-<!-- outr Current Date: \d{4}-\d{2}-\d{2} -->
-<!-- out Current Date: ${{date}} -->
+<!-- out ${{time}} -->
 
-```bash
-echo '{"id":"550e8400-e29b-41d4-a716-446655440000"}'
+```stdout
+10:05:56
 ```
-<!-- out {"id":"${{uuid}}"} -->
+
+This is a random uuid
+```bash
+uuid=$(uuidgen)
+echo "$uuid"   
+```
+<!-- out ${{uuid}} -->
+
+```stdout
+61ffb464-bfc8-4fef-9644-9498065cd6ff
+```
+
+

@@ -66,7 +66,6 @@ func ParseDirective(data []byte, start int) (*Directive, bool) {
 		content = bytes.TrimSpace(inner[keywordEnd+1:])
 	}
 
-	// Parse keyword into DirectiveKind
 	kind := ParseDirectiveKind(keyword)
 	if kind == DirectiveUnknown {
 		return nil, false

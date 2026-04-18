@@ -77,7 +77,7 @@ func expandTypes(content string) (string, error) {
 
 func expandTypesWithEscaping(content string) (string, error) {
 	var err error
-	
+
 	// Split the content by the type pattern matches
 	matches := typePatternRegex.FindAllStringIndex(content, -1)
 	if len(matches) == 0 {

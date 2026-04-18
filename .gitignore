@@ -1,4 +1,5 @@
 /bin/
 src/VERSION
 makedo
-
+AGENTS.md
+DHCP.md
