@@ -17,7 +17,7 @@ Let's say we want to verify the flag `-h` of makedo does its job correctly and i
 We have to add `<!-- out makedo  -->` after the fenced block. We are saying, check that the output contains `makedo [command]`
 
 ```bash
-./bin/makedo -h
+makedo -h
 ```
  <!-- out A markdown-based task runner -->
 

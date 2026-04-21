@@ -186,6 +186,7 @@ func VerifyMarkdown(mdPath string) error {
 			fmt.Printf("    expected: %s\n", r.Expected)
 			fmt.Printf("    actual:   %s\n", r.Actual)
 		}
+		return fmt.Errorf("%d tests failed", len(results)-passed)
 	}
 
 	return nil

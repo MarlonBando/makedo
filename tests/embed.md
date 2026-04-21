@@ -14,7 +14,7 @@ echo "hello embed"
 <!-- out hello embed -->
 EOF
 
-./bin/makedo embed /tmp/test_embed_1.md > /dev/null
+makedo embed /tmp/test_embed_1.md > /dev/null
 ````
 <!-- cmd grep -q '```stdout' /tmp/test_embed_1.md -->
 <!-- cmd grep -q 'hello embed' /tmp/test_embed_1.md -->
@@ -35,7 +35,7 @@ old data
 ```
 EOF
 
-./bin/makedo embed /tmp/test_embed_2.md > /dev/null
+makedo embed /tmp/test_embed_2.md > /dev/null
 ````
 <!-- cmd grep -q 'new data' /tmp/test_embed_2.md -->
 <!-- cmd ! grep -q 'old data' /tmp/test_embed_2.md -->
@@ -56,7 +56,7 @@ keep me
 ```
 EOF
 
-./bin/makedo embed /tmp/test_embed_3.md > /dev/null
+makedo embed /tmp/test_embed_3.md > /dev/null
 ````
 <!-- cmd grep -q 'keep me' /tmp/test_embed_3.md -->
 

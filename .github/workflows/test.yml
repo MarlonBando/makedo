@@ -1,0 +1,34 @@
+name: Makedo Integration Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build makedo
+        run: |
+          cd src
+          go mod tidy
+          go build -ldflags "-X main.versionString=$(cat ../VERSION)" -o ../bin/makedo
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Run Markdown Tests
+        run: |
+          # Loop through all markdown files in the tests/ folder
+          for test_file in tests/*.md; do
+            echo "Running tests in $test_file"
+            makedo test "$test_file"
+          done

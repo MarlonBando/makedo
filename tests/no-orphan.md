@@ -16,7 +16,7 @@ Ensure port 8866 is not already in use before running the test:
 Execute the background test which starts a Python HTTP server on port 8866:
 
 ```bash
-./bin/makedo test tests/background.md
+makedo test tests/background.md
 ```
 <!-- out 2/2 tests passed -->
 
