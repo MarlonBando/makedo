@@ -81,7 +81,7 @@ Check that a tool exists and outputs the correct version pattern.
 ```bash
 git --version
 ```
-<!-- out ^git version -->
+<!-- out git version ${{version}} -->
 <!-- cmd git --version -->
 
 ## File Permissions Example
