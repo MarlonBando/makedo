@@ -252,13 +252,13 @@ func TestCheckDirectiveTypeExpansion(t *testing.T) {
 	source := []byte("<!-- out Hello ${{date}} -->")
 	directive, _ := nodes.ParseDirective(source, 0)
 	output := []byte("Hello 2023-10-25\n")
-	
+
 	// Needs to precompile
 	patterns, err := PrecompileDirectives([]*nodes.Directive{directive}, source)
 	if err != nil {
 		t.Fatalf("Precompile failed: %v", err)
 	}
-	
+
 	result := CheckDirective(output, directive, source, patterns)
 	if !result.Passed {
 		t.Errorf("Expected output to contain 'Hello 2023-10-25', got failure")

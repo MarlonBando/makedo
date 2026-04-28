@@ -147,7 +147,13 @@ func EmbedMarkdownFile(mdFile string) error {
 			continue
 		}
 
-		newOutput := fmt.Sprintf("\n```stdout\n%s\n```\n", string(bytes.TrimSpace(result.Output)))
+		// Substitute patterns in output string
+		finalOutput := bytes.TrimSpace(result.Output)
+		if !blockFailed && len(directives) > 0 {
+			finalOutput = executor.SubstituteOutput(finalOutput, directives, source)
+		}
+
+		newOutput := fmt.Sprintf("\n```stdout\n%s\n```\n", string(finalOutput))
 
 		if outBlock := block.OutputBlock(); outBlock != nil {
 			// Extract old output content
