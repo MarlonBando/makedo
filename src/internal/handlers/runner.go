@@ -110,7 +110,6 @@ func (ctx *renderContext) handleMakeDoCodeBlock(block *nodes.MakeDoCodeBlock) (a
 	return ctx.handleCodeBlock(block, block.Code(ctx.source), block.Directives())
 }
 
-
 func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives []*nodes.Directive) (ast.WalkStatus, error) {
 	lines := node.Lines()
 	contentStart := lines.At(0).Start

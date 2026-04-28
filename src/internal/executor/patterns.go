@@ -119,3 +119,39 @@ func expandTypesWithEscaping(content string) (string, error) {
 
 	return sb.String(), err
 }
+
+// SubstituteOutput scans directives for ${{type}} placeholders and replaces all occurrences
+// of those types raw patterns in the output with the placeholder string.
+func SubstituteOutput(output []byte, directives []*nodes.Directive, source []byte) []byte {
+	if len(directives) == 0 {
+		return output
+	}
+
+	// NOTE: parsing and compiling regexes here could be optimized later by doing it
+	// during PrecompileDirectives or using a global map.
+	seenTypes := make(map[string]bool)
+
+	for _, d := range directives {
+		content := d.ContentString(source)
+		matches := typePatternRegex.FindAllStringSubmatch(content, -1)
+
+		for _, match := range matches {
+			if len(match) <= 1 {
+				continue
+			}
+
+			typeName := match[1]
+			pattern, ok := TypePatterns[typeName]
+			if !ok || seenTypes[typeName] {
+				continue
+			}
+
+			seenTypes[typeName] = true
+			re := regexp.MustCompile(pattern)
+			replacement := []byte("${{" + typeName + "}}")
+			output = re.ReplaceAll(output, replacement)
+		}
+	}
+
+	return output
+}
