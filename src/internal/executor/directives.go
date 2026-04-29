@@ -21,23 +21,48 @@ type DirectiveResult struct {
 func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *DirectiveResult {
 	content := d.ContentString(source)
 
+	var res *DirectiveResult
 	switch d.Kind {
 	case nodes.DirectiveOut:
 		if re, ok := compiledPatterns[d]; ok {
-			return checkOutPrecompiled(output, re, content)
+			res = checkOutPrecompiled(output, re, content)
+		} else {
+			res = checkOut(output, content)
 		}
-		return checkOut(output, content)
 	case nodes.DirectiveOutRegex:
 		if re, ok := compiledPatterns[d]; ok {
-			return checkOutPrecompiled(output, re, content)
+			res = checkOutPrecompiled(output, re, content)
+		} else {
+			res = checkOutRegex(output, content)
 		}
-		return checkOutRegex(output, content)
 	case nodes.DirectiveCmd:
-		return checkCmd(content)
+		res = checkCmd(content)
 	case nodes.DirectivePwd:
-		return checkPwd(content)
+		res = checkPwd(content)
+	default:
+		res = &DirectiveResult{Passed: true}
 	}
-	return &DirectiveResult{Passed: true}
+
+	if d.Negated {
+		// Do not invert structural errors
+		isStructuralErr := res.Err != nil
+		if isStructuralErr {
+			// Check if it's an ExitError (which represents a command failure, not structural)
+			if _, isExitError := res.Err.(*exec.ExitError); isExitError {
+				isStructuralErr = false
+			}
+		}
+
+		if !isStructuralErr {
+			res.Passed = !res.Passed
+			res.Expected = "NOT " + res.Expected
+			if res.Passed {
+				res.Err = nil
+			}
+		}
+	}
+
+	return res
 }
 
 func checkOutPrecompiled(output []byte, re *regexp.Regexp, expected string) *DirectiveResult {

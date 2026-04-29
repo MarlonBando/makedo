@@ -111,6 +111,20 @@ func TestParseDirective(t *testing.T) {
 			input:  "<!--   -->",
 			wantOK: false,
 		},
+		{
+			name:    "negated out directive",
+			input:   "<!-- !out failed -->",
+			wantOK:  true,
+			kind:    DirectiveOut,
+			content: "failed",
+		},
+		{
+			name:    "negated cmd directive",
+			input:   "<!-- !cmd exit 1 -->",
+			wantOK:  true,
+			kind:    DirectiveCmd,
+			content: "exit 1",
+		},
 	}
 
 	for _, tc := range tests {
@@ -129,6 +143,17 @@ func TestParseDirective(t *testing.T) {
 
 			if d.Kind != tc.kind {
 				t.Errorf("kind = %v, want %v", d.Kind, tc.kind)
+			}
+
+			// For our new negated tests, verify Negated flag is set properly
+			if len(tc.name) > 7 && tc.name[:7] == "negated" {
+				if !d.Negated {
+					t.Errorf("expected directive to be Negated = true")
+				}
+			} else {
+				if d.Negated {
+					t.Errorf("expected directive to be Negated = false")
+				}
 			}
 
 			gotContent := d.ContentString(source)
