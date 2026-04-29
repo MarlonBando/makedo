@@ -18,6 +18,9 @@ type DirectiveResult struct {
 }
 
 // CheckDirective evaluates a directive against output and returns the result.
+// TODO: The `output` parameter currently represents the combined stdout+stderr stream.
+// Future implementation of an `err` directive will require splitting this signature
+// to accept separate streams, or using a structured chunking mechanism.
 func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *DirectiveResult {
 	content := d.ContentString(source)
 

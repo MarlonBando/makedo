@@ -56,6 +56,9 @@ func Execute(code string, directives []*nodes.Directive, source []byte, stream b
 
 	var wg sync.WaitGroup
 	wg.Add(2)
+	// TODO: stdout and stderr are multiplexed into the same output channel.
+	// This means 'out' and 'outr' directives check the combined stream.
+	// Revisit this if we want strict separation (e.g., implementing an 'err' directive for stderr only).
 	go pumpOutput(stdout, output, done, &wg)
 	go pumpOutput(stderr, output, done, &wg)
 	go func() {
