@@ -226,6 +226,20 @@ func TestCheckDirectives(t *testing.T) {
 			content:  `^version 1\.`,
 			wantPass: false,
 		},
+		{
+			name:     "checkpath matches current dir",
+			output:   []byte(""),
+			kind:     nodes.DirectiveCheckpath,
+			content:  ".",
+			wantPass: true,
+		},
+		{
+			name:     "checkpath does not match non-existent file",
+			output:   []byte(""),
+			kind:     nodes.DirectiveCheckpath,
+			content:  "non_existent_file_12345",
+			wantPass: false,
+		},
 	}
 
 	for _, tt := range tests {

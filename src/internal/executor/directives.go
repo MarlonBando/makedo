@@ -39,6 +39,8 @@ func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPa
 		res = checkCmd(content)
 	case nodes.DirectivePwd:
 		res = checkPwd(content)
+	case nodes.DirectiveCheckpath:
+		res = checkPath(content)
 	default:
 		res = &DirectiveResult{Passed: true}
 	}
@@ -141,6 +143,18 @@ func checkPwd(pattern string) *DirectiveResult {
 	}
 }
 
+func checkPath(path string) *DirectiveResult {
+	path = strings.TrimSpace(path)
+	// TODO: expand environment variables
+
+	_, err := os.Stat(path)
+	return &DirectiveResult{
+		Passed:   err == nil,
+		Expected: path,
+		Actual:   path,
+	}
+}
+
 func matchGlob(path, pattern string) (bool, error) {
 	starCount := strings.Count(pattern, "*")
 
@@ -174,7 +188,7 @@ func normalizePath(p string) string {
 func checkFastDirectives(output []byte, directives []*nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp) bool {
 	for _, d := range directives {
 		switch d.Kind {
-		case nodes.DirectiveOut, nodes.DirectiveOutRegex, nodes.DirectivePwd:
+		case nodes.DirectiveOut, nodes.DirectiveOutRegex, nodes.DirectivePwd, nodes.DirectiveCheckpath:
 			if !CheckDirective(output, d, source, compiledPatterns).Passed {
 				return false
 			}
