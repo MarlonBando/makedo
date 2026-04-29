@@ -17,6 +17,7 @@ var (
 type Directive struct {
 	Kind    DirectiveKind // The resolved directive type
 	Content text.Segment  // Byte range for content in source (zero-copy)
+	Negated bool          // True if the directive was prefixed with '!' (e.g. !out)
 }
 
 // ContentString returns the content as a string.
@@ -66,6 +67,14 @@ func ParseDirective(data []byte, start int) (*Directive, bool) {
 		content = bytes.TrimSpace(inner[keywordEnd+1:])
 	}
 
+	// TODO: would be nice to check for something like '! keyword'
+	// so with the space before the keyword? For now it's fine
+	negated := false
+	if len(keyword) > 0 && keyword[0] == '!' {
+		negated = true
+		keyword = keyword[1:]
+	}
+
 	kind := ParseDirectiveKind(keyword)
 	if kind == DirectiveUnknown {
 		return nil, false
@@ -77,13 +86,18 @@ func ParseDirective(data []byte, start int) (*Directive, bool) {
 		prefixLen := len(commentStart)
 		leadingSpaces := countLeadingSpaces(data[prefixLen:])
 		keywordStart := prefixLen + leadingSpaces
-		contentStart := start + keywordStart + len(keyword) + 1 + countLeadingSpaces(inner[keywordEnd+1:])
+		keywordLen := len(keyword)
+		if negated {
+			keywordLen++ // Account for the '!' that was stripped
+		}
+		contentStart := start + keywordStart + keywordLen + 1 + countLeadingSpaces(inner[keywordEnd+1:])
 		contentSeg = text.NewSegment(contentStart, contentStart+len(content))
 	}
 
 	return &Directive{
 		Kind:    kind,
 		Content: contentSeg,
+		Negated: negated,
 	}, true
 }
 
