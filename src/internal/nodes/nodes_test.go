@@ -125,6 +125,13 @@ func TestParseDirective(t *testing.T) {
 			kind:    DirectiveCmd,
 			content: "exit 1",
 		},
+		{
+			name:    "checkpath directive",
+			input:   "<!-- checkpath foo.txt -->",
+			wantOK:  true,
+			kind:    DirectiveCheckpath,
+			content: "foo.txt",
+		},
 	}
 
 	for _, tc := range tests {
@@ -185,6 +192,13 @@ func TestMakeDoTransformer(t *testing.T) {
 			wantMakeDo: 1,
 			wantFenced: 0,
 			wantKind:   DirectiveCmd,
+		},
+		{
+			name:       "code block with checkpath directive",
+			markdown:   "```bash\necho hello\n```\n<!-- checkpath foo.txt -->",
+			wantMakeDo: 1,
+			wantFenced: 0,
+			wantKind:   DirectiveCheckpath,
 		},
 		{
 			name:       "code block without directive",
