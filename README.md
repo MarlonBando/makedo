@@ -9,7 +9,7 @@ Makedo allows you to:
 - Run all the codes in a markdown file (useful for setup)
 
 ## How does it work?
-Makedo looks for fenced code block followed by html comment in this format <!-- keyword content -->
+Makedo looks for fenced code block followed by html comment in this format `<!-- keyword content -->`
 The content of the comment tells makedo what expect from the code block output.
 When markdown is rendered makedo directives will be hidden, to see them you have to view the raw code
 
