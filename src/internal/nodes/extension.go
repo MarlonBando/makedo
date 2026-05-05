@@ -39,15 +39,14 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 			return ast.WalkContinue, nil
 		}
 
-		// Don't turn stdout blocks into MakeDoCodeBlocks.
-		// They are the output of previous MakeDoCodeBlocks.
 		lang := codeBlock.Language(source)
-		if bytes.Equal(lang, []byte("stdout")) {
+		if !isShellLanguage(lang) {
 			return ast.WalkContinue, nil
 		}
 
 		var directives []*Directive
 		var htmlBlocks []*ast.HTMLBlock
+		hasSkip := false
 		var next ast.Node
 
 		// Collect consecutive HTML blocks that are valid directives
@@ -71,9 +70,16 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 			if !ok {
 				break
 			}
+			if directive.Kind == DirectiveSkip {
+				hasSkip = true
+			}
 
 			directives = append(directives, directive)
 			htmlBlocks = append(htmlBlocks, htmlBlock)
+		}
+
+		if hasSkip {
+			return ast.WalkContinue, nil
 		}
 
 		var outputBlock *ast.FencedCodeBlock
@@ -135,6 +141,13 @@ func extractHTMLBlockContent(block *ast.HTMLBlock, source []byte) []byte {
 		buf.Write(seg.Value(source))
 	}
 	return buf.Bytes()
+}
+
+func isShellLanguage(lang []byte) bool {
+	return bytes.Equal(lang, []byte("bash")) ||
+		bytes.Equal(lang, []byte("sh")) ||
+		bytes.Equal(lang, []byte("zsh")) ||
+		bytes.Equal(lang, []byte("shell"))
 }
 
 // MakeDoExtension is a goldmark extension that transforms code blocks with

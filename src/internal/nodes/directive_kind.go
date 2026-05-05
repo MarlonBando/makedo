@@ -9,6 +9,7 @@ const (
 	DirectiveCmd
 	DirectivePwd
 	DirectiveCheckpath
+	DirectiveSkip
 )
 
 // For fewer keywords probably a slice would be faster
@@ -21,6 +22,7 @@ var directiveKeywords = map[string]DirectiveKind{
 	"cmd":       DirectiveCmd,
 	"pwd":       DirectivePwd,
 	"checkpath": DirectiveCheckpath,
+	"skip":      DirectiveSkip,
 }
 
 // ParseDirectiveKind returns the DirectiveKind for a keyword.
@@ -53,6 +55,8 @@ func (k DirectiveKind) String() string {
 		return "pwd"
 	case DirectiveCheckpath:
 		return "checkpath"
+	case DirectiveSkip:
+		return "skip"
 	default:
 		return "unknown"
 	}

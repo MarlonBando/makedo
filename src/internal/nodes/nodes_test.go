@@ -16,6 +16,7 @@ func TestDirectiveKind(t *testing.T) {
 	}{
 		{[]byte("out"), DirectiveOut},
 		{[]byte("cmd"), DirectiveCmd},
+		{[]byte("skip"), DirectiveSkip},
 		{[]byte("unknown"), DirectiveUnknown},
 		{[]byte(""), DirectiveUnknown},
 	}
@@ -34,6 +35,9 @@ func TestDirectiveKind(t *testing.T) {
 	if !IsValidKeyword([]byte("cmd")) {
 		t.Error("expected 'cmd' to be valid")
 	}
+	if !IsValidKeyword([]byte("skip")) {
+		t.Error("expected 'skip' to be valid")
+	}
 	if IsValidKeyword([]byte("unknown")) {
 		t.Error("expected 'unknown' to be invalid")
 	}
@@ -44,6 +48,9 @@ func TestDirectiveKind(t *testing.T) {
 	}
 	if DirectiveCmd.String() != "cmd" {
 		t.Errorf("DirectiveCmd.String() = %q, want %q", DirectiveCmd.String(), "cmd")
+	}
+	if DirectiveSkip.String() != "skip" {
+		t.Errorf("DirectiveSkip.String() = %q, want %q", DirectiveSkip.String(), "skip")
 	}
 	if DirectiveUnknown.String() != "unknown" {
 		t.Errorf("DirectiveUnknown.String() = %q, want %q", DirectiveUnknown.String(), "unknown")
@@ -57,6 +64,7 @@ func TestParseDirective(t *testing.T) {
 		wantOK  bool
 		kind    DirectiveKind
 		content string
+		negated bool
 	}{
 		{
 			name:    "valid directive with content",
@@ -64,6 +72,7 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveOut,
 			content: "hello world",
+			negated: false,
 		},
 		{
 			name:    "valid directive without content",
@@ -71,6 +80,7 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveOut,
 			content: "",
+			negated: false,
 		},
 		{
 			name:    "valid cmd directive",
@@ -78,6 +88,7 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveCmd,
 			content: "ls -la",
+			negated: false,
 		},
 		{
 			name:    "valid directive with extra whitespace",
@@ -85,6 +96,7 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveOut,
 			content: "hello",
+			negated: false,
 		},
 		{
 			name:   "unregistered keyword",
@@ -117,6 +129,7 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveOut,
 			content: "failed",
+			negated: true,
 		},
 		{
 			name:    "negated cmd directive",
@@ -124,6 +137,7 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveCmd,
 			content: "exit 1",
+			negated: true,
 		},
 		{
 			name:    "checkpath directive",
@@ -131,6 +145,28 @@ func TestParseDirective(t *testing.T) {
 			wantOK:  true,
 			kind:    DirectiveCheckpath,
 			content: "foo.txt",
+			negated: false,
+		},
+		{
+			name:    "skip directive",
+			input:   "<!-- skip -->",
+			wantOK:  true,
+			kind:    DirectiveSkip,
+			content: "",
+			negated: false,
+		},
+		{
+			name:    "skip directive with reason",
+			input:   "<!-- skip keep as docs-only -->",
+			wantOK:  true,
+			kind:    DirectiveSkip,
+			content: "keep as docs-only",
+			negated: false,
+		},
+		{
+			name:   "negated skip directive is invalid",
+			input:  "<!-- !skip -->",
+			wantOK: false,
 		},
 	}
 
@@ -152,15 +188,8 @@ func TestParseDirective(t *testing.T) {
 				t.Errorf("kind = %v, want %v", d.Kind, tc.kind)
 			}
 
-			// For our new negated tests, verify Negated flag is set properly
-			if len(tc.name) > 7 && tc.name[:7] == "negated" {
-				if !d.Negated {
-					t.Errorf("expected directive to be Negated = true")
-				}
-			} else {
-				if d.Negated {
-					t.Errorf("expected directive to be Negated = false")
-				}
+			if d.Negated != tc.negated {
+				t.Errorf("Negated = %v, want %v", d.Negated, tc.negated)
 			}
 
 			gotContent := d.ContentString(source)
@@ -203,26 +232,44 @@ func TestMakeDoTransformer(t *testing.T) {
 		{
 			name:       "code block without directive",
 			markdown:   "```bash\necho hello\n```",
-			wantMakeDo: 0,
-			wantFenced: 1,
+			wantMakeDo: 1,
+			wantFenced: 0,
 		},
 		{
 			name:       "code block with regular comment",
 			markdown:   "```bash\necho hello\n```\n<!-- just a note -->",
-			wantMakeDo: 0,
-			wantFenced: 1,
+			wantMakeDo: 1,
+			wantFenced: 0,
 		},
 		{
 			name:       "code block with unregistered keyword",
 			markdown:   "```bash\necho hello\n```\n<!-- config something -->",
+			wantMakeDo: 1,
+			wantFenced: 0,
+		},
+		{
+			name:       "code block with skip directive remains fenced",
+			markdown:   "```bash\necho hello\n```\n<!-- skip -->",
 			wantMakeDo: 0,
 			wantFenced: 1,
 		},
 		{
+			name:       "code block with skip and other directives remains fenced",
+			markdown:   "```bash\necho hello\n```\n<!-- out hello -->\n<!-- skip -->",
+			wantMakeDo: 0,
+			wantFenced: 1,
+		},
+		{
+			name:       "skip keeps nearby stdout block untouched",
+			markdown:   "```bash\necho hello\n```\n<!-- skip -->\n```stdout\nhello\n```",
+			wantMakeDo: 0,
+			wantFenced: 2,
+		},
+		{
 			name:       "multiple code blocks mixed",
 			markdown:   "```bash\necho one\n```\n<!-- out one -->\n\n```bash\necho two\n```",
-			wantMakeDo: 1,
-			wantFenced: 1,
+			wantMakeDo: 2,
+			wantFenced: 0,
 		},
 	}
 
