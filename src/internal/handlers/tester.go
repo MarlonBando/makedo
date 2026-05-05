@@ -100,22 +100,22 @@ func VerifyMarkdown(mdPath string) error {
 		lines := block.Lines()
 		startLine := lineNumber(source, lines.At(0).Start)
 
-		// Execute block using executor
 		code := block.Code(source)
 
+		//patterns map is used to avoid recompiling the regex at every iteration in case
+		//of a long running task like a server setup
 		var patterns map[*nodes.Directive]*regexp.Regexp
-		if len(directives) > 0 {
-			patterns, err = executor.PrecompileDirectives(directives, source)
-			if err != nil {
-				fmt.Printf("failed to precompile directives: %v\n", err)
-				return ast.WalkContinue, nil
-			}
+		patterns, err = executor.PrecompileDirectives(directives, source)
+		if err != nil {
+			fmt.Printf("failed to precompile directives: %v\n", err)
+			return ast.WalkContinue, nil
 		}
 
 		execResult := executor.Execute(string(code), directives, source, false)
 
-		// Register process for cleanup if still running
 		if execResult.Process != nil && execResult.Status != executor.Completed {
+			// we add to registry all the process that are still running
+			// so we can clean them up
 			registry.Add(execResult.Process)
 		}
 
@@ -177,6 +177,7 @@ func VerifyMarkdown(mdPath string) error {
 		}
 		return ast.WalkContinue, nil
 	})
+
 	if walkErr != nil {
 		return walkErr
 	}
