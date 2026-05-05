@@ -79,6 +79,9 @@ func ParseDirective(data []byte, start int) (*Directive, bool) {
 	if kind == DirectiveUnknown {
 		return nil, false
 	}
+	if kind == DirectiveSkip && negated {
+		return nil, false
+	}
 
 	// Calculate content segment offset relative to start
 	var contentSeg text.Segment

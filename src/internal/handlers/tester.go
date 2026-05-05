@@ -85,7 +85,7 @@ func VerifyMarkdown(mdPath string) error {
 	testNum := 0
 
 	// Walk AST and run tests
-	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	walkErr := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -97,18 +97,15 @@ func VerifyMarkdown(mdPath string) error {
 		block := n.(*nodes.MakeDoCodeBlock)
 		directives := block.Directives()
 
-		// Skip blocks without directives
-		if len(directives) == 0 {
-			return ast.WalkContinue, nil
-		}
-
 		lines := block.Lines()
 		startLine := lineNumber(source, lines.At(0).Start)
 
-		// Execute block using executor
 		code := block.Code(source)
 
-		patterns, err := executor.PrecompileDirectives(directives, source)
+		//patterns map is used to avoid recompiling the regex at every iteration in case
+		//of a long running task like a server setup
+		var patterns map[*nodes.Directive]*regexp.Regexp
+		patterns, err = executor.PrecompileDirectives(directives, source)
 		if err != nil {
 			fmt.Printf("failed to precompile directives: %v\n", err)
 			return ast.WalkContinue, nil
@@ -116,9 +113,34 @@ func VerifyMarkdown(mdPath string) error {
 
 		execResult := executor.Execute(string(code), directives, source, false)
 
-		// Register process for cleanup if still running
 		if execResult.Process != nil && execResult.Status != executor.Completed {
+			// we add to registry all the process that are still running
+			// so we can clean them up
 			registry.Add(execResult.Process)
+		}
+
+		// No-directive shell blocks are setup blocks: run them but do not count as tests.
+		if len(directives) == 0 {
+			if execResult.Err != nil {
+				return ast.WalkStop, fmt.Errorf("setup block at line %d failed: %w", startLine, execResult.Err)
+			}
+			if execResult.Status == executor.Completed && execResult.ExitCode != 0 {
+				return ast.WalkStop, fmt.Errorf("setup block at line %d failed: command exited with code %d", startLine, execResult.ExitCode)
+			}
+			return ast.WalkContinue, nil
+		}
+
+		if execResult.Err != nil {
+			testNum++
+			fmt.Printf("test %d... failed\n", testNum)
+			results = append(results, &TestResult{
+				Passed:    false,
+				StartLine: startLine,
+				Expected:  "command to execute successfully",
+				Actual:    string(code),
+				Error:     execResult.Err,
+			})
+			return ast.WalkContinue, nil
 		}
 
 		// Handle stall: with directives = fail
@@ -155,6 +177,10 @@ func VerifyMarkdown(mdPath string) error {
 		}
 		return ast.WalkContinue, nil
 	})
+
+	if walkErr != nil {
+		return walkErr
+	}
 
 	// Print summary
 	passed := 0

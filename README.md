@@ -36,6 +36,10 @@ At the moment we have the following directives:
 - outr [regex] -> check if stout contains [regex]
 - cmd  [content] -> run a command. If it succed the test is passed
 - pwd  [content] -> check if pwd print [content]
+- skip [optional note] -> keep the shell block as normal markdown (makedo will not run/test/embed it)
+
+Shell fenced code blocks with language `bash`, `sh`, `zsh`, or `shell` are processed by default.
+Use `<!-- skip -->` as a hard opt-out when you want to keep a shell block as docs-only content.
 
 ### Dynamic Types in Directives
 Makedo supports testing dynamic output (like dates, UUIDs, or IP addresses) using a special `${{type}}` syntax. This allows you to match dynamic text without writing complex regular expressions.
