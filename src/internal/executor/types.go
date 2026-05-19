@@ -22,6 +22,7 @@ type Result struct {
 	ExitCode int         // -1 if still running or error
 	Process  *os.Process // For cleanup if still running
 	Err      error       // Start/pipe error (not exit failure)
+	Warnings []error     // Non-fatal warnings encountered during execution
 }
 
 // Registry tracks processes for cleanup at document end.
