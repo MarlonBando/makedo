@@ -22,6 +22,8 @@ func EmbedMarkdownFile(mdFile string) error {
 		return err
 	}
 
+	var allWarnings []string
+
 	// Process registry for cleanup at document end
 	registry := executor.NewRegistry()
 	defer registry.KillAll()
@@ -95,12 +97,15 @@ func EmbedMarkdownFile(mdFile string) error {
 
 		code := string(block.Code(source))
 		result := executor.Execute(code, directives, source, false)
+		lineNum := lineNumber(source, block.Lines().At(0).Start)
+
+		for _, warn := range result.Warnings {
+			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdFile, lineNum, warn))
+		}
 
 		if result.Process != nil && result.Status != executor.Completed {
 			registry.Add(result.Process)
 		}
-
-		lineNum := lineNumber(source, block.Lines().At(0).Start)
 
 		blockFailed := false
 		var failReason string
@@ -149,6 +154,7 @@ func EmbedMarkdownFile(mdFile string) error {
 
 		// Substitute patterns in output string
 		finalOutput := bytes.TrimSpace(result.Output)
+
 		if !blockFailed && len(directives) > 0 {
 			finalOutput = executor.SubstituteOutput(finalOutput, directives, source)
 		}
@@ -172,7 +178,7 @@ func EmbedMarkdownFile(mdFile string) error {
 				buf = append(buf, newOutput...)
 			}
 			lastPos = end
-		} else {
+		} else if len(newOutput) > 0 {
 			added++
 			buf = append(buf, newOutput...)
 			lastPos = blockEnd
@@ -198,6 +204,13 @@ func EmbedMarkdownFile(mdFile string) error {
 		summary += fmt.Sprintf(", %d failed", failed)
 	}
 	fmt.Println(summary)
+
+	if len(allWarnings) > 0 {
+		fmt.Println("\nWarnings Summary:")
+		for _, w := range allWarnings {
+			fmt.Printf("- %s\n", w)
+		}
+	}
 
 	return nil
 }

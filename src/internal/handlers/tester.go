@@ -71,6 +71,8 @@ func VerifyMarkdown(mdPath string) error {
 		return err
 	}
 
+	var allWarnings []string
+
 	// Process registry for cleanup at document end
 	registry := executor.NewRegistry()
 	defer registry.KillAll()
@@ -112,6 +114,10 @@ func VerifyMarkdown(mdPath string) error {
 		}
 
 		execResult := executor.Execute(string(code), directives, source, false)
+
+		for _, warn := range execResult.Warnings {
+			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdPath, startLine, warn))
+		}
 
 		if execResult.Process != nil && execResult.Status != executor.Completed {
 			// we add to registry all the process that are still running
@@ -193,6 +199,13 @@ func VerifyMarkdown(mdPath string) error {
 	fmt.Println()
 	fmt.Printf("=== Summary ===\n")
 	fmt.Printf("%d/%d tests passed\n", passed, len(results))
+
+	if len(allWarnings) > 0 {
+		fmt.Println("\nWarnings Summary:")
+		for _, w := range allWarnings {
+			fmt.Printf("- %s\n", w)
+		}
+	}
 
 	// Print failed tests details
 	if passed < len(results) {

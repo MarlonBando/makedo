@@ -2,10 +2,12 @@ package executor
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -30,6 +32,11 @@ func Execute(code string, directives []*nodes.Directive, source []byte, stream b
 		return &Result{Err: err, ExitCode: -1}
 	}
 
+	var warnings []error
+	if hasBackgroundOperator(code) {
+		warnings = append(warnings, fmt.Errorf("detected & in block! makedo manages background processes automatically. Split long-running commands into their own block and use a directive to signal readiness"))
+	}
+
 	cmd := exec.Command(os.Getenv("SHELL"), "-c", code)
 
 	// Set up process group so we can kill the entire tree
@@ -39,15 +46,15 @@ func Execute(code string, directives []*nodes.Directive, source []byte, stream b
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return &Result{Err: err, ExitCode: -1}
+		return &Result{Err: err, ExitCode: -1, Warnings: warnings}
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return &Result{Err: err, ExitCode: -1}
+		return &Result{Err: err, ExitCode: -1, Warnings: warnings}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return &Result{Err: err, ExitCode: -1}
+		return &Result{Err: err, ExitCode: -1, Warnings: warnings}
 	}
 
 	// Channel for output chunks, closed when both readers exit
@@ -67,6 +74,7 @@ func Execute(code string, directives []*nodes.Directive, source []byte, stream b
 	}()
 
 	result := monitor(cmd, output, done, directives, source, stream, compiledPatterns)
+	result.Warnings = append(result.Warnings, warnings...)
 
 	// If process still running, it stays alive for registry to kill later
 	return result
@@ -204,4 +212,129 @@ func pumpOutput(r io.Reader, ch chan<- []byte, done <-chan struct{}, wg *sync.Wa
 			return
 		}
 	}
+}
+
+type byteRange struct{ start, end int }
+
+// stringRanges scans a single line and returns the byte ranges occupied
+// by quoted strings. Single-quoted strings have no escape sequences.
+// Double-quoted strings honour backslash escapes (e.g. \").
+func stringRanges(b string, ranges []byteRange) []byteRange {
+	ranges = ranges[:0]
+	i := 0
+	for i < len(b) {
+		switch b[i] {
+		case '\'':
+			start := i
+			i++
+			for i < len(b) && b[i] != '\'' {
+				i++
+			}
+			if i < len(b) {
+				i++ // consume closing '
+			}
+			ranges = append(ranges, byteRange{start, i})
+
+		case '"':
+			start := i
+			i++
+			for i < len(b) && b[i] != '"' {
+				if b[i] == '\\' && i+1 < len(b) {
+					i++ // skip the escaped character
+				}
+				i++
+			}
+			if i < len(b) {
+				i++ // consume closing "
+			}
+			ranges = append(ranges, byteRange{start, i})
+
+		default:
+			i++
+		}
+	}
+	return ranges
+}
+
+// inAnyRange reports whether pos falls inside any of the given ranges.
+func inAnyRange(pos int, ranges []byteRange) bool {
+	for _, r := range ranges {
+		if pos >= r.start && pos < r.end {
+			return true
+		}
+	}
+	return false
+}
+
+// stripComment returns the slice of b up to the first # that falls
+// outside a quoted string, trimming trailing whitespace.
+// strRanges must have been computed on b before calling.
+func stripComment(b string, strRanges []byteRange) string {
+	for i := 0; i < len(b); i++ {
+		if b[i] == '#' && !inAnyRange(i, strRanges) {
+			return strings.TrimRight(b[:i], " \t")
+		}
+	}
+	return b
+}
+
+// hasBackgroundOp scans b for a lone & (not part of &&) that is outside
+// any quoted string and is either followed by a space/tab or sits at
+// the end of the slice — the unambiguous shell background operator.
+// strRanges must have been computed on the original line before comment
+// stripping; they remain valid because stripComment only shortens from
+// the right, never before any string range.
+func hasBackgroundOp(b string, strRanges []byteRange) bool {
+	for i := 0; i < len(b); i++ {
+		if b[i] != '&' {
+			continue
+		}
+		if inAnyRange(i, strRanges) {
+			continue
+		}
+		// && → logical AND, skip both characters.
+		if i+1 < len(b) && b[i+1] == '&' {
+			i++
+			continue
+		}
+		// & followed by space/tab or sitting at end of line.
+		if i+1 == len(b) || b[i+1] == ' ' || b[i+1] == '\t' {
+			return true
+		}
+	}
+	return false
+}
+
+// HasBackgroundOp walks each line of a shell code block and returns
+// the first line that contains a background operator outside of any
+// quoted string or comment.
+func hasBackgroundOperator(code string) bool {
+	var strRanges []byteRange
+	for len(code) > 0 {
+		var line string
+		idx := strings.IndexByte(code, '\n')
+		if idx >= 0 {
+			line = code[:idx]
+			code = code[idx+1:]
+		} else {
+			line = code
+			code = ""
+		}
+
+		trimmed := strings.TrimSpace(line)
+
+		// Skip blank lines and full-line comments.
+		if len(trimmed) == 0 || trimmed[0] == '#' {
+			continue
+		}
+
+		strRanges = stringRanges(trimmed, strRanges)
+		effective := stripComment(trimmed, strRanges)
+
+		if hasBackgroundOp(effective, strRanges) {
+			return true
+		}
+	}
+
+	return false
 }
