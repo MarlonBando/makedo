@@ -82,6 +82,11 @@ func ParseDirective(data []byte, start int) (*Directive, bool) {
 	if kind == DirectiveSkip && negated {
 		return nil, false
 	}
+	if kind == DirectiveCmd && content == nil {
+		// This will avoid using <!-- cmd --> as bypass
+		// llm likes to find work around for tests
+		return nil, false
+	}
 
 	// Calculate content segment offset relative to start
 	var contentSeg text.Segment

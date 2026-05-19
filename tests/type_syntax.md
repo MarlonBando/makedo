@@ -5,9 +5,8 @@ This is how you get the time in bash
 date +%T
 ```
 <!-- out ${{time}} -->
-
 ```stdout
-10:05:56
+${{time}}
 ```
 
 This is a random uuid
@@ -16,9 +15,13 @@ uuid=$(uuidgen)
 echo "$uuid"   
 ```
 <!-- out ${{uuid}} -->
-
 ```stdout
-61ffb464-bfc8-4fef-9644-9498065cd6ff
+${{uuid}}
 ```
-
-
+```bash
+echo "v3.4.5"
+```
+<!-- out v${{version}} -->
+```stdout
+v${{version}}
+```
