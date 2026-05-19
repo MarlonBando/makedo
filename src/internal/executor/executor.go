@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -218,8 +219,8 @@ type byteRange struct{ start, end int }
 // stringRanges scans a single line and returns the byte ranges occupied
 // by quoted strings. Single-quoted strings have no escape sequences.
 // Double-quoted strings honour backslash escapes (e.g. \").
-func stringRanges(b []byte) []byteRange {
-	var ranges []byteRange
+func stringRanges(b string, ranges []byteRange) []byteRange {
+	ranges = ranges[:0]
 	i := 0
 	for i < len(b) {
 		switch b[i] {
@@ -268,10 +269,10 @@ func inAnyRange(pos int, ranges []byteRange) bool {
 // stripComment returns the slice of b up to the first # that falls
 // outside a quoted string, trimming trailing whitespace.
 // strRanges must have been computed on b before calling.
-func stripComment(b []byte, strRanges []byteRange) []byte {
+func stripComment(b string, strRanges []byteRange) string {
 	for i := 0; i < len(b); i++ {
 		if b[i] == '#' && !inAnyRange(i, strRanges) {
-			return bytes.TrimRight(b[:i], " \t")
+			return strings.TrimRight(b[:i], " \t")
 		}
 	}
 	return b
@@ -283,7 +284,7 @@ func stripComment(b []byte, strRanges []byteRange) []byte {
 // strRanges must have been computed on the original line before comment
 // stripping; they remain valid because stripComment only shortens from
 // the right, never before any string range.
-func hasBackgroundOp(b []byte, strRanges []byteRange) bool {
+func hasBackgroundOp(b string, strRanges []byteRange) bool {
 	for i := 0; i < len(b); i++ {
 		if b[i] != '&' {
 			continue
@@ -308,15 +309,26 @@ func hasBackgroundOp(b []byte, strRanges []byteRange) bool {
 // the first line that contains a background operator outside of any
 // quoted string or comment.
 func hasBackgroundOperator(code string) bool {
-	for _, line := range bytes.Split([]byte(code), []byte("\n")) {
-		trimmed := bytes.TrimSpace(line)
+	var strRanges []byteRange
+	for len(code) > 0 {
+		var line string
+		idx := strings.IndexByte(code, '\n')
+		if idx >= 0 {
+			line = code[:idx]
+			code = code[idx+1:]
+		} else {
+			line = code
+			code = ""
+		}
+
+		trimmed := strings.TrimSpace(line)
 
 		// Skip blank lines and full-line comments.
 		if len(trimmed) == 0 || trimmed[0] == '#' {
 			continue
 		}
 
-		strRanges := stringRanges(trimmed)
+		strRanges = stringRanges(trimmed, strRanges)
 		effective := stripComment(trimmed, strRanges)
 
 		if hasBackgroundOp(effective, strRanges) {
