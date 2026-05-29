@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"makedo/internal/engine"
 	"makedo/internal/handlers"
 
 	"github.com/spf13/cobra"
@@ -15,7 +16,9 @@ var testCmd = &cobra.Command{
 	Long:  `Run code blocks followed by html comment in the format of '<!-- directive <content> -->'  verify their output matches the expected pattern.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := handlers.VerifyMarkdown(args[0])
+		ctx := engine.NewRunContext()
+		defer ctx.Cleanup()
+		err := handlers.VerifyMarkdown(args[0], ctx)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)

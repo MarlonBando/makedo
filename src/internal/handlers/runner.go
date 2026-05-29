@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"makedo/internal/executor"
+	"makedo/internal/engine"
 	"makedo/internal/nodes"
 
 	"github.com/charmbracelet/glamour"
@@ -35,20 +35,16 @@ type renderContext struct {
 	source          []byte
 	glamourRenderer *glamour.TermRenderer
 	lastPos         int
-	registry        *executor.Registry
+	registry        *engine.Registry
 }
 
-func RunMarkdownFile(mdFile string) error {
+func RunMarkdownFile(mdFile string, runCtx *engine.RunContext) error {
 	mdFile = strings.TrimSpace(mdFile)
 
 	source, err := os.ReadFile(mdFile)
 	if err != nil {
 		return err
 	}
-
-	// Process registry for cleanup at document end
-	registry := executor.NewRegistry()
-	defer registry.KillAll()
 
 	renderer, err := glamour.NewTermRenderer(
 		glamour.WithStyles(getNoIndentStyle()),
@@ -70,7 +66,7 @@ func RunMarkdownFile(mdFile string) error {
 		source:          source,
 		glamourRenderer: renderer,
 		lastPos:         0,
-		registry:        registry,
+		registry:        runCtx.Registry,
 	}
 
 	// Walk AST and render/execute sequentially
@@ -139,12 +135,12 @@ func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives
 	// Execute with streaming output
 	fmt.Println("---")
 
-	result := executor.Execute(string(code), directives, ctx.source, true)
+	result := engine.Execute(string(code), directives, ctx.source, true)
 
 	fmt.Println("---")
 
 	// Register process for cleanup if still running
-	if result.Process != nil && result.Status != executor.Completed {
+	if result.Process != nil && result.Status != engine.Completed {
 		ctx.registry.Add(result.Process)
 	}
 

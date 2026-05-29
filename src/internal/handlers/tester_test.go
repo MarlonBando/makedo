@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"makedo/internal/engine"
 )
 
 func TestVerifyMarkdownRunsSetupBlockWithoutCountingTest(t *testing.T) {
@@ -25,7 +26,9 @@ func TestVerifyMarkdownRunsSetupBlockWithoutCountingTest(t *testing.T) {
 
 	var verifyErr error
 	output := captureStdout(t, func() {
-		verifyErr = VerifyMarkdown(mdPath)
+		ctx := engine.NewRunContext()
+		defer ctx.Cleanup()
+		verifyErr = VerifyMarkdown(mdPath, ctx)
 	})
 
 	if verifyErr != nil {
@@ -57,7 +60,9 @@ func TestVerifyMarkdownFailsOnSetupBlockNonZeroExit(t *testing.T) {
 
 	var verifyErr error
 	_ = captureStdout(t, func() {
-		verifyErr = VerifyMarkdown(mdPath)
+		ctx := engine.NewRunContext()
+		defer ctx.Cleanup()
+		verifyErr = VerifyMarkdown(mdPath, ctx)
 	})
 
 	if verifyErr == nil {
