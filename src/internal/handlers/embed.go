@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"makedo/internal/executor"
+	"makedo/internal/engine"
 	"makedo/internal/nodes"
 
 	"github.com/yuin/goldmark"
@@ -14,7 +14,7 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-func EmbedMarkdownFile(mdFile string) error {
+func EmbedMarkdownFile(mdFile string, ctx *engine.RunContext) error {
 	mdFile = strings.TrimSpace(mdFile)
 
 	source, err := os.ReadFile(mdFile)
@@ -23,10 +23,6 @@ func EmbedMarkdownFile(mdFile string) error {
 	}
 
 	var allWarnings []string
-
-	// Process registry for cleanup at document end
-	registry := executor.NewRegistry()
-	defer registry.KillAll()
 
 	md := goldmark.New(
 		goldmark.WithExtensions(
@@ -89,52 +85,17 @@ func EmbedMarkdownFile(mdFile string) error {
 
 		buf = append(buf, source[lastPos:blockEnd]...)
 
-		patterns, err := executor.PrecompileDirectives(directives, source)
-		if err != nil {
-			fmt.Printf("[WARN] Failed to precompile directives: %v\n", err)
-			continue
-		}
-
 		code := string(block.Code(source))
-		result := executor.Execute(code, directives, source, false)
 		lineNum := lineNumber(source, block.Lines().At(0).Start)
 
-		for _, warn := range result.Warnings {
+		outcome := engine.EvaluateBlock(code, directives, source, lineNum, ctx)
+
+		for _, warn := range outcome.ExecResult.Warnings {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdFile, lineNum, warn))
 		}
 
-		if result.Process != nil && result.Status != executor.Completed {
-			registry.Add(result.Process)
-		}
-
-		blockFailed := false
-		var failReason string
-
-		if result.Err != nil {
-			blockFailed = true
-			failReason = result.Err.Error()
-		} else if result.Status == executor.Completed && result.ExitCode > 0 {
-			blockFailed = true
-			failReason = fmt.Sprintf("exit code %d", result.ExitCode)
-		} else if result.Status == executor.Stalled && len(directives) > 0 {
-			blockFailed = true
-			failReason = "command stalled before directives passed"
-		} else {
-			for _, d := range directives {
-				testRes := testDirective(d, result, source, lineNum, patterns)
-				if testRes != nil && !testRes.Passed {
-					blockFailed = true
-					if testRes.Error != nil {
-						failReason = testRes.Error.Error()
-					} else {
-						failReason = fmt.Sprintf("directive '%s' failed to match", string(d.Kind))
-					}
-					break
-				}
-			}
-		}
-
-		if blockFailed {
+		if !outcome.Passed {
+			failReason := outcome.FailReason.Error()
 			fmt.Printf("[WARN] Block at line %d failed (%s), skipping output update\n", lineNum, failReason)
 			failed++
 
@@ -152,14 +113,18 @@ func EmbedMarkdownFile(mdFile string) error {
 			continue
 		}
 
-		// Substitute patterns in output string
-		finalOutput := bytes.TrimSpace(result.Output)
+		// Use the FinalOutput calculated by the EvaluateBlock which already handled Substitutions
+		finalOutput := string(outcome.FinalOutput)
 
-		if !blockFailed && len(directives) > 0 {
-			finalOutput = executor.SubstituteOutput(finalOutput, directives, source)
+		var newOutput string
+		if len(finalOutput) > 0 || len(directives) > 0 {
+			newOutput = fmt.Sprintf("\n```stdout\n%s\n```\n", finalOutput)
+		} else {
+			// If there's literally no output and no directives, we probably don't even need a stdout block?
+			// But for consistency let's preserve the original behavior which printed it if string(finalOutput) wasn't completely empty after trim.
+			// Let's just follow the original logic which allowed empty blocks if we appended them.
+			newOutput = fmt.Sprintf("\n```stdout\n%s\n```\n", finalOutput)
 		}
-
-		newOutput := fmt.Sprintf("\n```stdout\n%s\n```\n", string(finalOutput))
 
 		if outBlock := block.OutputBlock(); outBlock != nil {
 			// Extract old output content
@@ -178,9 +143,11 @@ func EmbedMarkdownFile(mdFile string) error {
 				buf = append(buf, newOutput...)
 			}
 			lastPos = end
-		} else if len(newOutput) > 0 {
+		} else if len(finalOutput) > 0 {
 			added++
 			buf = append(buf, newOutput...)
+			lastPos = blockEnd
+		} else {
 			lastPos = blockEnd
 		}
 	}

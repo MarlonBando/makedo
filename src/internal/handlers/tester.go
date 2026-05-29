@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
-	"makedo/internal/executor"
+	"makedo/internal/engine"
 	"makedo/internal/nodes"
 
 	"github.com/yuin/goldmark"
@@ -15,55 +14,12 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// TestResult holds the result of a single directive test for reporting.
-type TestResult struct {
-	Passed    bool
-	StartLine int
-	Expected  string
-	Actual    string
-	Error     error
-}
-
 // lineNumber converts a byte offset to a 1-indexed line number
 func lineNumber(source []byte, offset int) int {
 	return bytes.Count(source[:offset], []byte{'\n'}) + 1
 }
 
-// testDirective tests a single directive against execution result
-func testDirective(d *nodes.Directive, execResult *executor.Result, source []byte, startLine int, patterns map[*nodes.Directive]*regexp.Regexp) *TestResult {
-	// Handle non-zero exit for completed commands
-	if execResult.Status == executor.Completed && execResult.ExitCode != 0 {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  "command to succeed",
-			Actual:    string(execResult.Output),
-			Error:     fmt.Errorf("command exited with code %d", execResult.ExitCode),
-		}
-	}
-
-	// If executor returned Ready, cmd directives already passed during execution
-	if d.Kind == nodes.DirectiveCmd && execResult.Status == executor.Ready {
-		return &TestResult{
-			Passed:    true,
-			StartLine: startLine,
-			Expected:  "exit 0",
-			Actual:    d.ContentString(source),
-		}
-	}
-
-	// Use shared directive checking
-	check := executor.CheckDirective(execResult.Output, d, source, patterns)
-	return &TestResult{
-		Passed:    check.Passed,
-		StartLine: startLine,
-		Expected:  check.Expected,
-		Actual:    check.Actual,
-		Error:     check.Err,
-	}
-}
-
-func VerifyMarkdown(mdPath string) error {
+func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 	mdPath = strings.TrimSpace(mdPath)
 
 	source, err := os.ReadFile(mdPath)
@@ -73,17 +29,13 @@ func VerifyMarkdown(mdPath string) error {
 
 	var allWarnings []string
 
-	// Process registry for cleanup at document end
-	registry := executor.NewRegistry()
-	defer registry.KillAll()
-
 	md := goldmark.New(
 		goldmark.WithExtensions(nodes.NewMakeDoExtension()),
 	)
 	reader := text.NewReader(source)
 	doc := md.Parser().Parse(reader)
 
-	var results []*TestResult
+	var results []*engine.TestResult
 	testNum := 0
 
 	// Walk AST and run tests
@@ -102,85 +54,54 @@ func VerifyMarkdown(mdPath string) error {
 		lines := block.Lines()
 		startLine := lineNumber(source, lines.At(0).Start)
 
-		code := block.Code(source)
+		code := string(block.Code(source))
 
-		//patterns map is used to avoid recompiling the regex at every iteration in case
-		//of a long running task like a server setup
-		var patterns map[*nodes.Directive]*regexp.Regexp
-		patterns, err = executor.PrecompileDirectives(directives, source)
-		if err != nil {
-			fmt.Printf("failed to precompile directives: %v\n", err)
-			return ast.WalkContinue, nil
-		}
+		outcome := engine.EvaluateBlock(code, directives, source, startLine, ctx)
 
-		execResult := executor.Execute(string(code), directives, source, false)
-
-		for _, warn := range execResult.Warnings {
+		for _, warn := range outcome.ExecResult.Warnings {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdPath, startLine, warn))
-		}
-
-		if execResult.Process != nil && execResult.Status != executor.Completed {
-			// we add to registry all the process that are still running
-			// so we can clean them up
-			registry.Add(execResult.Process)
 		}
 
 		// No-directive shell blocks are setup blocks: run them but do not count as tests.
 		if len(directives) == 0 {
-			if execResult.Err != nil {
-				return ast.WalkStop, fmt.Errorf("setup block at line %d failed: %w", startLine, execResult.Err)
-			}
-			if execResult.Status == executor.Completed && execResult.ExitCode != 0 {
-				return ast.WalkStop, fmt.Errorf("setup block at line %d failed: command exited with code %d", startLine, execResult.ExitCode)
+			if !outcome.Passed {
+				return ast.WalkStop, fmt.Errorf("setup block at line %d failed: %w", startLine, outcome.FailReason)
 			}
 			return ast.WalkContinue, nil
 		}
 
-		if execResult.Err != nil {
-			testNum++
-			fmt.Printf("test %d... failed\n", testNum)
-			results = append(results, &TestResult{
-				Passed:    false,
-				StartLine: startLine,
-				Expected:  "command to execute successfully",
-				Actual:    string(code),
-				Error:     execResult.Err,
-			})
-			return ast.WalkContinue, nil
-		}
-
-		// Handle stall: with directives = fail
-		if execResult.Status == executor.Stalled {
-			testNum++
-			fmt.Printf("test %d... failed (stalled)\n", testNum)
-			results = append(results, &TestResult{
-				Passed:    false,
-				StartLine: startLine,
-				Expected:  "directives to pass before stall timeout",
-				Actual:    "no output for 10s",
-				Error:     fmt.Errorf("command stalled"),
-			})
-			return ast.WalkContinue, nil
-		}
-
-		// Test each directive for reporting
-		for _, directive := range directives {
-			result := testDirective(directive, execResult, source, startLine, patterns)
-			if result == nil {
-				continue
+		// Handle stall, execution err, or command fail that happened before directives
+		// EvaluateBlock already catches these, but we need to print test status
+		if outcome.ExecResult.Err != nil || (outcome.ExecResult.Status == engine.Stalled && len(directives) > 0) || (outcome.ExecResult.Status == engine.Completed && outcome.ExecResult.ExitCode != 0) {
+			// Actually, if it failed on the block level rather than a specific directive, we might not have a TestResult.
+			if len(outcome.TestResults) == 0 {
+				testNum++
+				fmt.Printf("test %d... failed\n", testNum)
+				results = append(results, &engine.TestResult{
+					Passed:    false,
+					StartLine: startLine,
+					Expected:  "command to execute successfully without stalling",
+					Actual:    fmt.Sprintf("failed with: %v", outcome.FailReason),
+					Error:     outcome.FailReason,
+				})
+				return ast.WalkContinue, nil
 			}
+		}
 
+		// Print reporting for individual directives
+		for _, testRes := range outcome.TestResults {
 			testNum++
 			fmt.Printf("test %d... ", testNum)
 
-			if result.Passed {
+			if testRes.Passed {
 				fmt.Println("succeeded")
 			} else {
 				fmt.Println("failed")
 			}
 
-			results = append(results, result)
+			results = append(results, testRes)
 		}
+
 		return ast.WalkContinue, nil
 	})
 
