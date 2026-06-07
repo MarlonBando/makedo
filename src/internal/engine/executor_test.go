@@ -12,7 +12,7 @@ import (
 )
 
 func TestExecuteFastCommand(t *testing.T) {
-	result := Execute("echo hello", nil, nil, false)
+	result := Execute(&RunContext{}, "echo hello", nil, nil, false)
 
 	if result.Status != Completed {
 		t.Errorf("expected Completed, got %v", result.Status)
@@ -26,7 +26,7 @@ func TestExecuteFastCommand(t *testing.T) {
 }
 
 func TestExecuteCommandWithNonZeroExit(t *testing.T) {
-	result := Execute("exit 42", nil, nil, false)
+	result := Execute(&RunContext{}, "exit 42", nil, nil, false)
 
 	if result.Status != Completed {
 		t.Errorf("expected Completed, got %v", result.Status)
@@ -43,7 +43,7 @@ func TestExecuteWithOutDirective(t *testing.T) {
 		Content: text.NewSegment(9, 14), // "hello"
 	}
 
-	result := Execute("echo hello world", []*nodes.Directive{directive}, source, false)
+	result := Execute(&RunContext{}, "echo hello world", []*nodes.Directive{directive}, source, false)
 
 	// Can be either Completed (if command exits before we check) or Ready (if directive passes first)
 	if result.Status != Completed && result.Status != Ready {
@@ -66,7 +66,7 @@ func TestExecuteStallsWithNoOutput(t *testing.T) {
 	StallTimeout = 500 * time.Millisecond
 	defer func() { StallTimeout = oldTimeout }()
 
-	result := Execute("sleep 10", nil, nil, false)
+	result := Execute(&RunContext{}, "sleep 10", nil, nil, false)
 
 	if result.Status != Stalled {
 		t.Errorf("expected Stalled, got %v", result.Status)
@@ -92,7 +92,7 @@ func TestExecuteLongRunningWithDirective(t *testing.T) {
 	start := time.Now()
 	// This command outputs "ready" then sleeps - but it completes quickly
 	// because shell sees echo finish before sleep starts in pipeline
-	result := Execute("echo ready && sleep 10", []*nodes.Directive{directive}, source, false)
+	result := Execute(&RunContext{}, "echo ready && sleep 10", []*nodes.Directive{directive}, source, false)
 	elapsed := time.Since(start)
 
 	// Should complete much faster than 10s (directive matches immediately)
@@ -127,7 +127,7 @@ func TestExecuteServerWithCurlDirective(t *testing.T) {
 	}
 
 	start := time.Now()
-	result := Execute(
+	result := Execute(&RunContext{}, 
 		"python3 -m http.server "+port+" --bind 127.0.0.1 2>&1",
 		[]*nodes.Directive{directive},
 		source,
@@ -163,7 +163,7 @@ func TestRegistryKillAll(t *testing.T) {
 	// Use short stall timeout
 	oldTimeout := StallTimeout
 	StallTimeout = 200 * time.Millisecond
-	result := Execute("sleep 100", nil, nil, false)
+	result := Execute(&RunContext{}, "sleep 100", nil, nil, false)
 	StallTimeout = oldTimeout
 
 	if result.Process == nil {
@@ -259,7 +259,7 @@ func TestCheckDirectives(t *testing.T) {
 }
 
 func runShellCmd(cmd string) error {
-	return Execute(cmd, nil, nil, false).Err
+	return Execute(&RunContext{}, cmd, nil, nil, false).Err
 }
 
 func TestCheckDirectiveTypeExpansion(t *testing.T) {

@@ -38,7 +38,7 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 		return outcome
 	}
 
-	execResult := Execute(code, directives, source, false)
+	execResult := Execute(ctx, code, directives, source, false)
 	outcome.ExecResult = execResult
 
 	if execResult.Process != nil && execResult.Status != Completed {
