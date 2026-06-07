@@ -35,7 +35,6 @@ type renderContext struct {
 	source          []byte
 	glamourRenderer *glamour.TermRenderer
 	lastPos         int
-	registry        *engine.Registry
 	runCtx          *engine.RunContext
 }
 
@@ -67,7 +66,6 @@ func RunMarkdownFile(mdFile string, runCtx *engine.RunContext) error {
 		source:          source,
 		glamourRenderer: renderer,
 		lastPos:         0,
-		registry:        runCtx.Registry,
 		runCtx:          runCtx,
 	}
 
@@ -143,7 +141,7 @@ func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives
 
 	// Register process for cleanup if still running
 	if result.Process != nil && result.Status != engine.Completed {
-		ctx.registry.Add(result.Process)
+		ctx.runCtx.Registry.Add(result.Process)
 	}
 
 	// Print error/status message
