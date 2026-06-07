@@ -36,6 +36,7 @@ type renderContext struct {
 	glamourRenderer *glamour.TermRenderer
 	lastPos         int
 	registry        *engine.Registry
+	runCtx          *engine.RunContext
 }
 
 func RunMarkdownFile(mdFile string, runCtx *engine.RunContext) error {
@@ -67,6 +68,7 @@ func RunMarkdownFile(mdFile string, runCtx *engine.RunContext) error {
 		glamourRenderer: renderer,
 		lastPos:         0,
 		registry:        runCtx.Registry,
+		runCtx:          runCtx,
 	}
 
 	// Walk AST and render/execute sequentially
@@ -135,7 +137,7 @@ func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives
 	// Execute with streaming output
 	fmt.Println("---")
 
-	result := engine.Execute(string(code), directives, ctx.source, true)
+	result := engine.Execute(ctx.runCtx, string(code), directives, ctx.source, true)
 
 	fmt.Println("---")
 

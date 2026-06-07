@@ -11,7 +11,10 @@ var embedCmd = &cobra.Command{
 	Short: "Run fenced code blocks and embed output into the markdown file",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := engine.NewRunContext()
+		ctx, err := engine.NewRunContext()
+		if err != nil {
+			return err
+		}
 		defer ctx.Cleanup()
 		return handlers.EmbedMarkdownFile(args[0], ctx)
 	},

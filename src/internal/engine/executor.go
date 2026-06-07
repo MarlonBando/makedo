@@ -26,7 +26,13 @@ var StallTimeout = 10 * time.Second
 
 // Execute runs a command with goroutine-based output monitoring.
 // Returns when: command exits, all directives pass, or output stalls.
-func Execute(code string, directives []*nodes.Directive, source []byte, stream bool) *Result {
+func Execute(ctx *RunContext, code string, directives []*nodes.Directive, source []byte, stream bool) *Result {
+	if ctx != nil && ctx.MkEnvFile != "" {
+		// Use a newline instead of && to safely prepend the source command,
+		// allowing multiline scripts to execute properly.
+		code = fmt.Sprintf("source %q\n%s", ctx.MkEnvFile, code)
+	}
+
 	compiledPatterns, err := PrecompileDirectives(directives, source)
 	if err != nil {
 		return &Result{Err: err, ExitCode: -1}
