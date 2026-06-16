@@ -1,17 +1,18 @@
 # makedo
 
-Makedo is a tool that bring integration testing directly inside your markdown documentation.
+Makedo is a tool that bring testing directly inside your markdown documentation.
 Documentation becomes the tests and tests become doumentation.
 
 Makedo allows you to:
-- Verify that your documentation is still saying the truth
-- Run integration testing on your cli tool using markdown
-- Run all the codes in a markdown file (useful for setup)
+- Verify that your documentation is still saying the truth.
+- Run integration and system testing on your cli tool using markdown.
+- Embed the output of your commands automatically inside of the markdown.
+- Run all the fenced code block in a markdown file (useful for setup)
 
 ## How does it work?
 Makedo looks for fenced code block followed by html comment in this format `<!-- keyword content -->`
 The content of the comment tells makedo what expect from the code block output.
-When markdown is rendered makedo directives will be hidden, to see them you have to view the raw code
+When markdown is rendered makedo directives will be hidden, if you want to make them renderable wrap them into backticks`` like we did for this README.md file. 
 
 Let's say we want to verify the flag `-h` of makedo does its job correctly and it prints how to use it.
 We have to add `<!-- out makedo  -->` after the fenced block. We are saying, check that the output contains `makedo [command]`
@@ -19,16 +20,16 @@ We have to add `<!-- out makedo  -->` after the fenced block. We are saying, che
 ```bash
 makedo -h
 ```
- <!-- out A markdown-based task runner -->
+`<!-- out A markdown-based task runner -->`
 
-We can also run a cli command to validate our fenced block.
+We can also run a cli command to validate our fenced code block.
 For instance our fenced block just installed Git, manually we would use `git -v` to check if it's installed.
-We can tell makedo to do so with `<!-- cmd git -v -->`
+We can tell makedo to do so with `<!-- cmd git -v -->`. Note that this time is hidden 
 
 ```bash
 echo "Pretending to install git..."
 ```
-<!-- cmd git -v -->
+`<!-- cmd git -v -->`
 
 ### Available directives
 At the moment we have the following directives:
@@ -48,7 +49,7 @@ You can use these types in both `out` and `outr` directives:
 ```bash
 echo "Created user 550e8400-e29b-41d4-a716-446655440000 on 2023-10-25"
 ```
-<!-- out Created user ${{uuid}} on ${{date}} -->
+`<!-- out Created user ${{uuid}} on ${{date}} -->`
 
 Available built-in types:
 - `${{date}}`: Matches YYYY-MM-DD
