@@ -176,6 +176,26 @@ func extractHTMLBlockContent(block *ast.HTMLBlock, source []byte) []byte {
 	return buf.Bytes()
 }
 
+// IsLink returns the http/https destination of n if it is a Link, Image, or AutoLink
+// pointing at an http(s) URL. Returns (nil, false) otherwise.
+func IsLink(n ast.Node, source []byte) ([]byte, bool) {
+	var dest []byte
+	switch v := n.(type) {
+	case *ast.Link:
+		dest = v.Destination
+	case *ast.Image:
+		dest = v.Destination
+	case *ast.AutoLink:
+		dest = v.URL(source)
+	default:
+		return nil, false
+	}
+	if bytes.HasPrefix(dest, []byte("http://")) || bytes.HasPrefix(dest, []byte("https://")) {
+		return dest, true
+	}
+	return nil, false
+}
+
 func isShellLanguage(lang []byte) bool {
 	return bytes.Equal(lang, []byte("bash")) ||
 		bytes.Equal(lang, []byte("sh")) ||

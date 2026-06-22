@@ -109,6 +109,23 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 		return walkErr
 	}
 
+	// URL checks (opt-in via --check-urls). Runs after the directive walk so its
+	// results are appended to the same stream and counted in the same summary.
+	urlCount := 0
+	if ctx.CheckURLs {
+		urlResults := CheckURLs(doc, source)
+		urlCount = len(urlResults)
+		for _, r := range urlResults {
+			testNum++
+			if r.Passed {
+				fmt.Printf("test %d... succeeded\n", testNum)
+			} else {
+				fmt.Printf("test %d... failed\n", testNum)
+			}
+			results = append(results, r)
+		}
+	}
+
 	// Print summary
 	passed := 0
 	for _, r := range results {
@@ -120,6 +137,9 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 	fmt.Println()
 	fmt.Printf("=== Summary ===\n")
 	fmt.Printf("%d/%d tests passed\n", passed, len(results))
+	if ctx.CheckURLs {
+		fmt.Printf("%d URLs checked\n", urlCount)
+	}
 
 	if len(allWarnings) > 0 {
 		fmt.Println("\nWarnings Summary:")

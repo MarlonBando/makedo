@@ -17,6 +17,7 @@ var testCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		ctx.CheckURLs, _ = cmd.Flags().GetBool("check-urls")
 
 		defer ctx.Cleanup()
 		return handlers.VerifyMarkdown(args[0], ctx)
@@ -24,5 +25,6 @@ var testCmd = &cobra.Command{
 }
 
 func init() {
+	testCmd.Flags().Bool("check-urls", false, "GET every http(s) link in the document and fail if any do not return 2xx")
 	rootCmd.AddCommand(testCmd)
 }
