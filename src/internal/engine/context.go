@@ -10,6 +10,7 @@ type RunContext struct {
 	MkTmpDir  string
 	MkEnvFile string
 	Registry  *Registry
+	CheckURLs bool
 }
 
 func NewRunContext() (*RunContext, error) {
