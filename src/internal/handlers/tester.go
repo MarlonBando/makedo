@@ -35,15 +35,20 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 	reader := text.NewReader(source)
 	doc := md.Parser().Parse(reader)
 
-	var results []*engine.TestResult
-	testNum := 0
+	// Tallies (renderer-side dedupe: a command-failure block counts as 1
+	// failed "test" even if it produced N failed TestResults).
+	var (
+		passedTests  int
+		failedTests  int
+		failedBlocks []*failedBlock
+	)
 
-	// Walk AST and run tests
+	var setupErr error
+
 	walkErr := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-
 		if n.Kind() != nodes.KindMakeDoCodeBlock {
 			return ast.WalkContinue, nil
 		}
@@ -53,7 +58,6 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 
 		lines := block.Lines()
 		startLine := lineNumber(source, lines.At(0).Start)
-
 		code := string(block.Code(source))
 
 		outcome := engine.EvaluateBlock(code, directives, source, startLine, ctx)
@@ -62,44 +66,59 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdPath, startLine, warn))
 		}
 
-		// No-directive shell blocks are setup blocks: run them but do not count as tests.
+		// Setup block (no directives): doesn't count as a test, but
+		// still gets a panel on failure and aborts the walk.
 		if len(directives) == 0 {
 			if !outcome.Passed {
-				return ast.WalkStop, fmt.Errorf("setup block at line %d failed: %w", startLine, outcome.FailReason)
+				fb := &failedBlock{
+					mdPath:    mdPath,
+					startLine: startLine,
+					block:     block,
+					outcome:   outcome,
+					isSetup:   true,
+				}
+				failedBlocks = append(failedBlocks, fb)
+				progressMark(false)
+				setupErr = fmt.Errorf("setup block at line %d failed: %w", startLine, outcome.FailReason)
+				return ast.WalkStop, nil
 			}
 			return ast.WalkContinue, nil
 		}
 
-		// Handle stall, execution err, or command fail that happened before directives
-		// EvaluateBlock already catches these, but we need to print test status
-		if outcome.ExecResult.Err != nil || (outcome.ExecResult.Status == engine.Stalled && len(directives) > 0) || (outcome.ExecResult.Status == engine.Completed && outcome.ExecResult.ExitCode != 0) {
-			// Actually, if it failed on the block level rather than a specific directive, we might not have a TestResult.
-			if len(outcome.TestResults) == 0 {
-				testNum++
-				fmt.Printf("test %d... failed\n", testNum)
-				results = append(results, &engine.TestResult{
-					Passed:    false,
-					StartLine: startLine,
-					Expected:  "command to execute successfully without stalling",
-					Actual:    fmt.Sprintf("failed with: %v", outcome.FailReason),
-					Error:     outcome.FailReason,
-				})
-				return ast.WalkContinue, nil
-			}
+		cmdFail := commandFailed(outcome)
+
+		if cmdFail {
+			// Count the whole block as a single failure.
+			failedTests++
+			progressMark(false)
+			failedBlocks = append(failedBlocks, &failedBlock{
+				mdPath:    mdPath,
+				startLine: startLine,
+				block:     block,
+				outcome:   outcome,
+			})
+			return ast.WalkContinue, nil
 		}
 
-		// Print reporting for individual directives
-		for _, testRes := range outcome.TestResults {
-			testNum++
-			fmt.Printf("test %d... ", testNum)
-
-			if testRes.Passed {
-				fmt.Println("succeeded")
+		// Per-directive accounting.
+		blockHasFailure := false
+		for _, tr := range outcome.TestResults {
+			if tr.Passed {
+				passedTests++
+				progressMark(true)
 			} else {
-				fmt.Println("failed")
+				failedTests++
+				progressMark(false)
+				blockHasFailure = true
 			}
-
-			results = append(results, testRes)
+		}
+		if blockHasFailure {
+			failedBlocks = append(failedBlocks, &failedBlock{
+				mdPath:    mdPath,
+				startLine: startLine,
+				block:     block,
+				outcome:   outcome,
+			})
 		}
 
 		return ast.WalkContinue, nil
@@ -109,45 +128,32 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 		return walkErr
 	}
 
-	// Print summary
-	passed := 0
-	for _, r := range results {
-		if r.Passed {
-			passed++
-		}
-	}
-
-	fmt.Println()
-	fmt.Printf("=== Summary ===\n")
-	fmt.Printf("%d/%d tests passed\n", passed, len(results))
-
-	if len(allWarnings) > 0 {
-		fmt.Println("\nWarnings Summary:")
-		for _, w := range allWarnings {
-			fmt.Printf("- %s\n", w)
-		}
-	}
-
-	// Print failed tests details
-	if passed < len(results) {
+	// Failure panels (above summary)
+	if len(failedBlocks) > 0 {
 		fmt.Println()
-		fmt.Println("Failed tests:")
-		testNum = 0
-		for _, r := range results {
-			testNum++
-			if r.Passed {
-				continue
-			}
-			if r.Error != nil {
-				fmt.Printf("  test %d (line %d): %v\n", testNum, r.StartLine, r.Error)
-			} else {
-				fmt.Printf("  test %d (line %d): pattern did not match\n", testNum, r.StartLine)
-			}
-			fmt.Printf("    expected: %s\n", r.Expected)
-			fmt.Printf("    actual:   %s\n", r.Actual)
+		fmt.Println()
+		for _, fb := range failedBlocks {
+			fmt.Println(renderFailurePanel(fb, source))
 		}
-		return fmt.Errorf("%d tests failed", len(results)-passed)
 	}
 
+	// Warnings
+	if len(allWarnings) > 0 {
+		fmt.Println("Warnings:")
+		for _, w := range allWarnings {
+			fmt.Printf("  - %s\n", w)
+		}
+	}
+
+	// Summary
+	total := passedTests + failedTests
+	renderSummary(passedTests, total, len(failedBlocks))
+
+	if setupErr != nil {
+		return setupErr
+	}
+	if failedTests > 0 {
+		return fmt.Errorf("%d test(s) failed", failedTests)
+	}
 	return nil
 }
