@@ -15,11 +15,11 @@ import (
 
 // Colors. lipgloss auto-downgrades on non-TTY / NO_COLOR.
 var (
-	passStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // green
-	failStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // red
-	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // grey
-	headerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
-	boxStyle     = lipgloss.NewStyle().
+	passStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // green
+	failStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // red
+	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // grey
+	headerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
+	boxStyle    = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, false, true).
 			BorderForeground(lipgloss.Color("9")).
 			PaddingLeft(1)
@@ -228,7 +228,6 @@ func progressBlockEnd() {
 // failedTests/totalTests are at the TestResult granularity; failedBlocks
 // tells us how many distinct blocks failed (renderer-side dedupe).
 func renderSummary(passed, total, failedBlocks int) {
-	fmt.Println()
 	fmt.Println()
 	if failedBlocks == 0 {
 		fmt.Println(summaryOK.Render(fmt.Sprintf("✓ %d/%d tests passed", passed, total)))
