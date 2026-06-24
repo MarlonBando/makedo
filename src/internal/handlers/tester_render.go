@@ -205,13 +205,23 @@ func tailLines(b []byte, n int) []string {
 	return lines
 }
 
+// progressBlockHeader prints the per-block header line (no newline).
+func progressBlockHeader(mdPath string, line int) {
+	fmt.Printf("%s:%d ", mdPath, line)
+}
+
 // progressMark prints a single streaming mark for a test result.
 func progressMark(passed bool) {
 	if passed {
-		fmt.Print(passStyle.Render("."))
+		fmt.Print(passStyle.Render("\u2713"))
 	} else {
-		fmt.Print(failStyle.Render("F"))
+		fmt.Print(failStyle.Render("\u2717"))
 	}
+}
+
+// progressBlockEnd terminates a block's progress line.
+func progressBlockEnd() {
+	fmt.Println()
 }
 
 // renderSummary prints the final summary line.

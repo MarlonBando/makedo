@@ -62,6 +62,8 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 
 		outcome := engine.EvaluateBlock(code, directives, source, startLine, ctx)
 
+		progressBlockHeader(mdPath, startLine)
+
 		for _, warn := range outcome.ExecResult.Warnings {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdPath, startLine, warn))
 		}
@@ -79,9 +81,11 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 				}
 				failedBlocks = append(failedBlocks, fb)
 				progressMark(false)
+				progressBlockEnd()
 				setupErr = fmt.Errorf("setup block at line %d failed: %w", startLine, outcome.FailReason)
 				return ast.WalkStop, nil
 			}
+			progressBlockEnd()
 			return ast.WalkContinue, nil
 		}
 
@@ -91,6 +95,7 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 			// Count the whole block as a single failure.
 			failedTests++
 			progressMark(false)
+			progressBlockEnd()
 			failedBlocks = append(failedBlocks, &failedBlock{
 				mdPath:    mdPath,
 				startLine: startLine,
@@ -112,6 +117,7 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 				blockHasFailure = true
 			}
 		}
+		progressBlockEnd()
 		if blockHasFailure {
 			failedBlocks = append(failedBlocks, &failedBlock{
 				mdPath:    mdPath,
