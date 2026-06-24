@@ -72,12 +72,34 @@ func renderCode(code, lang string) string {
 	if codeRenderer == nil {
 		return code
 	}
-	md := "```" + lang + "\n" + code + "\n```"
+	fence := pickFence(code)
+	md := fence + lang + "\n" + code + "\n" + fence
 	out, err := codeRenderer.Render(md)
 	if err != nil {
 		return code
 	}
 	return strings.Trim(out, "\n")
+}
+
+// pickFence returns a backtick fence (>=3) longer than the longest backtick
+// run inside code, so embedded fences don't terminate ours early.
+func pickFence(code string) string {
+	max, run := 0, 0
+	for i := 0; i < len(code); i++ {
+		if code[i] == '`' {
+			run++
+			if run > max {
+				max = run
+			}
+		} else {
+			run = 0
+		}
+	}
+	n := max + 1
+	if n < 3 {
+		n = 3
+	}
+	return strings.Repeat("`", n)
 }
 
 // classifyBlock returns true if the command itself failed (so directives
