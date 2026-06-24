@@ -379,3 +379,22 @@ func TestMakeDoCodeBlock(t *testing.T) {
 		t.Error("IsRaw() = false, want true")
 	}
 }
+
+func TestParseDirectiveRange(t *testing.T) {
+	cases := []string{
+		"<!-- out hello -->",
+		"<!-- !out world -->",
+		"<!-- cmd echo -->",
+	}
+	for _, c := range cases {
+		source := []byte(c)
+		d, ok := ParseDirective(source, 0)
+		if !ok {
+			t.Fatalf("ParseDirective(%q) failed", c)
+		}
+		got := string(source[d.Range.Start:d.Range.Stop])
+		if got != c {
+			t.Errorf("Range round-trip = %q, want %q", got, c)
+		}
+	}
+}

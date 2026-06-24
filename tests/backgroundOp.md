@@ -12,7 +12,7 @@ EOF
 sed -i 's/AMPERSAND_TOKEN/\&/g' test1.md
 bin/makedo test test1.md
 ````
-<!-- out Warnings Summary: -->
+<!-- out Warnings: -->
 <!-- out detected & in block! -->
 
 
@@ -28,7 +28,7 @@ EOF
 sed -i 's/AMPERSAND_TOKEN/\&/g' test2.md
 bin/makedo test test2.md
 ````
-<!-- out Warnings Summary: -->
+<!-- out Warnings: -->
 <!-- out detected & in block! -->
 
 
@@ -44,7 +44,7 @@ EOF
 sed -i 's/AMPERSAND_TOKEN/\&/g' test3.md
 bin/makedo test test3.md
 ````
-<!-- !out Warnings Summary: -->
+<!-- !out Warnings: -->
 
 
 ### Test 4: `&&` logical AND should NOT warn
@@ -58,7 +58,7 @@ echo "Hello World" && echo Siuum
 EOF
 bin/makedo test test4.md
 ````
-<!-- !out Warnings Summary: -->
+<!-- !out Warnings: -->
 
 
 ### Test 5: Redirection `2>&1` should NOT warn
@@ -72,7 +72,7 @@ echo Siuuuuum > /dev/null 2>&1
 EOF
 bin/makedo test test5.md
 ````
-<!-- !out Warnings Summary: -->
+<!-- !out Warnings: -->
 
 
 ### Cleanup

@@ -17,6 +17,7 @@ var (
 type Directive struct {
 	Kind    DirectiveKind // The resolved directive type
 	Content text.Segment  // Byte range for content in source (zero-copy)
+	Range   text.Segment  // Byte range for full '<!-- ... -->' in source
 	Negated bool          // True if the directive was prefixed with '!' (e.g. !out)
 }
 
@@ -105,6 +106,7 @@ func ParseDirective(data []byte, start int) (*Directive, bool) {
 	return &Directive{
 		Kind:    kind,
 		Content: contentSeg,
+		Range:   text.NewSegment(start, start+len(data)),
 		Negated: negated,
 	}, true
 }
