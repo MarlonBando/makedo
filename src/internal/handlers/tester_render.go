@@ -77,7 +77,7 @@ func renderCode(code, lang string) string {
 	if err != nil {
 		return code
 	}
-	return strings.TrimRight(out, "\n")
+	return strings.Trim(out, "\n")
 }
 
 // classifyBlock returns true if the command itself failed (so directives
@@ -101,31 +101,26 @@ func commandFailed(o *engine.BlockOutcome) bool {
 
 // renderFailurePanel writes a single failure panel to a string.
 func renderFailurePanel(fb *failedBlock, source []byte) string {
-	var sb strings.Builder
-
-	// Header
-	header := fmt.Sprintf("FAIL %s:%d", fb.mdPath, fb.startLine)
+	var header strings.Builder
+	headerLine := fmt.Sprintf("FAIL %s:%d", fb.mdPath, fb.startLine)
 	if fb.isSetup {
-		header += "  (setup)"
+		headerLine += "  (setup)"
 	}
-	sb.WriteString(headerStyle.Render(header))
-	sb.WriteString("\n")
+	header.WriteString(headerStyle.Render(headerLine))
+	header.WriteString("\n")
 
-	// Code box
+	// Body: everything that goes inside the red-bordered box.
+	var body strings.Builder
+
 	lang := string(fb.block.Language(source))
 	code := string(fb.block.Code(source))
-	rendered := renderCode(code, lang)
-	sb.WriteString(boxStyle.Render(rendered))
-	sb.WriteString("\n")
+	body.WriteString(renderCode(code, lang))
 
 	cmdFail := commandFailed(fb.outcome)
-
-	// Directives
 	directives := fb.block.Directives()
+
 	if len(directives) > 0 {
-		// Map directive -> TestResult (positional; TestResults order matches directives
-		// minus any skip/special, but our render only needs per-directive state, so we
-		// pair by index where possible).
+		body.WriteString("\n")
 		results := fb.outcome.TestResults
 		for i, d := range directives {
 			line := string(source[d.Range.Start:d.Range.Stop])
@@ -134,36 +129,36 @@ func renderFailurePanel(fb *failedBlock, source []byte) string {
 			case cmdFail:
 				styled = dimStyle.Render("  " + line)
 			case i < len(results) && results[i].Passed:
-				styled = passStyle.Render("  ✓ " + line)
+				styled = passStyle.Render("\u2713 " + line)
 			case i < len(results):
-				styled = failStyle.Render("  ✗ " + line)
+				styled = failStyle.Render("\u2717 " + line)
 			default:
 				styled = dimStyle.Render("  " + line)
 			}
-			sb.WriteString(styled)
-			sb.WriteString("\n")
+			body.WriteString(styled)
+			body.WriteString("\n")
 
 			if !cmdFail && i < len(results) && !results[i].Passed {
 				r := results[i]
 				if r.Expected != "" {
-					sb.WriteString(dimStyle.Render("      expected: " + oneLine(r.Expected)))
-					sb.WriteString("\n")
+					body.WriteString(dimStyle.Render("    expected: " + oneLine(r.Expected)))
+					body.WriteString("\n")
 				}
 				if r.Actual != "" {
-					sb.WriteString(dimStyle.Render("      actual:   " + oneLine(r.Actual)))
-					sb.WriteString("\n")
+					body.WriteString(dimStyle.Render("    actual:   " + oneLine(r.Actual)))
+					body.WriteString("\n")
 				}
 				if r.Error != nil {
-					sb.WriteString(dimStyle.Render("      error:    " + r.Error.Error()))
-					sb.WriteString("\n")
+					body.WriteString(dimStyle.Render("    error:    " + r.Error.Error()))
+					body.WriteString("\n")
 				}
 			}
 		}
 	}
 
-	// Command-failure reason line
 	if cmdFail {
-		reason := ""
+		body.WriteString("\n")
+		var reason string
 		switch {
 		case fb.outcome.ExecResult.Err != nil:
 			reason = "error: " + fb.outcome.ExecResult.Err.Error()
@@ -173,22 +168,22 @@ func renderFailurePanel(fb *failedBlock, source []byte) string {
 			reason = fmt.Sprintf("exit %d", fb.outcome.ExecResult.ExitCode)
 		}
 		if reason != "" {
-			sb.WriteString(failStyle.Render("  " + reason))
-			sb.WriteString("\n")
+			body.WriteString(failStyle.Render(reason))
+			body.WriteString("\n")
 		}
-		// For setup blocks (or command failures), show tail of captured output.
 		out := bytes.TrimSpace(fb.outcome.ExecResult.Output)
 		if len(out) > 0 {
-			sb.WriteString(dimStyle.Render("  --- output (tail) ---"))
-			sb.WriteString("\n")
+			body.WriteString(dimStyle.Render("--- output (tail) ---"))
+			body.WriteString("\n")
 			for _, l := range tailLines(out, 20) {
-				sb.WriteString(dimStyle.Render("  " + l))
-				sb.WriteString("\n")
+				body.WriteString(dimStyle.Render(l))
+				body.WriteString("\n")
 			}
 		}
 	}
 
-	return sb.String()
+	bodyStr := strings.TrimRight(body.String(), "\n")
+	return header.String() + boxStyle.Render(bodyStr) + "\n"
 }
 
 func oneLine(s string) string {
