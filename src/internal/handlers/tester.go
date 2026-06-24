@@ -35,14 +35,9 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 	reader := text.NewReader(source)
 	doc := md.Parser().Parse(reader)
 
-	// Tallies (renderer-side dedupe: a command-failure block counts as 1
-	// failed "test" even if it produced N failed TestResults).
-	var (
-		passedTests  int
-		failedTests  int
-		failedBlocks []*failedBlock
-	)
-
+	var passedTests int
+	var failedTests int
+	var failedBlocks = make([]*failedBlock, 0, bytes.Count(source, []byte("\n```"))/2)
 	var setupErr error
 
 	walkErr := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
