@@ -79,6 +79,38 @@ func TestVerifyMarkdownFailsOnSetupBlockNonZeroExit(t *testing.T) {
 	}
 }
 
+func TestVerifyMarkdownHandlesPrecompileErrorGracefully(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+
+	tmpDir := t.TempDir()
+	mdPath := filepath.Join(tmpDir, "test.md")
+	md := "```bash\necho hello\n```\n<!-- outr *. -->\n"
+
+	if err := os.WriteFile(mdPath, []byte(md), 0644); err != nil {
+		t.Fatalf("failed to write markdown file: %v", err)
+	}
+
+	var verifyErr error
+	output := captureStdout(t, func() {
+		ctx, err := engine.NewRunContext()
+		if err != nil {
+			t.Fatalf("failed to create run context: %v", err)
+		}
+		defer ctx.Cleanup()
+		verifyErr = VerifyMarkdown(mdPath, ctx)
+	})
+
+	if verifyErr == nil {
+		t.Fatal("VerifyMarkdown() error = nil, want non-nil")
+	}
+	if !strings.Contains(verifyErr.Error(), "1 test(s) failed") {
+		t.Fatalf("unexpected error: %v", verifyErr)
+	}
+	if !strings.Contains(output, "failed to precompile directives: invalid regex '*.'") {
+		t.Fatalf("output does not contain precompile error:\n%s", output)
+	}
+}
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 

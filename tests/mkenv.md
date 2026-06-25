@@ -59,3 +59,16 @@ cd ..
 rmdir f
 ```
 <!-- !checkpath f/file.txt -->
+
+## CMD Env Sourcing
+
+Let's check if environment variables from `$MAKEDO_ENV` are available to cmd directives.
+
+```bash
+echo "CMD_TEST_VAR=cmd_success" >> $MAKEDO_ENV
+```
+
+```bash
+echo "Verifying CMD_TEST_VAR in cmd directive..."
+```
+`<!-- cmd [ "$CMD_TEST_VAR" = "cmd_success" ] -->`

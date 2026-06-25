@@ -21,7 +21,7 @@ type DirectiveResult struct {
 // TODO: The `output` parameter currently represents the combined stdout+stderr stream.
 // Future implementation of an `err` directive will require splitting this signature
 // to accept separate streams, or using a structured chunking mechanism.
-func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *DirectiveResult {
+func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *DirectiveResult {
 	content := d.ContentString(source)
 
 	var res *DirectiveResult
@@ -39,7 +39,7 @@ func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPa
 			res = checkOutRegex(output, content)
 		}
 	case nodes.DirectiveCmd:
-		res = checkCmd(content)
+		res = checkCmd(content, ctx)
 	case nodes.DirectivePwd:
 		res = checkPwd(content)
 	case nodes.DirectiveCheckpath:
@@ -107,8 +107,9 @@ func checkOutRegex(output []byte, pattern string) *DirectiveResult {
 	}
 }
 
-func checkCmd(command string) *DirectiveResult {
-	err := exec.Command(os.Getenv("SHELL"), "-c", command).Run()
+func checkCmd(command string, ctx *RunContext) *DirectiveResult {
+	cmdStr := fmt.Sprintf("source %q\n%s", ctx.MkEnvFile, command)
+	err := exec.Command(os.Getenv("SHELL"), "-c", cmdStr).Run()
 	return &DirectiveResult{
 		Passed:   err == nil,
 		Expected: "exit 0",
@@ -188,11 +189,11 @@ func normalizePath(p string) string {
 
 // checkFastDirectives tests output-dependent directives (out, outr, pwd).
 // These are cheap operations - no process spawn.
-func checkFastDirectives(output []byte, directives []*nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp) bool {
+func checkFastDirectives(output []byte, directives []*nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) bool {
 	for _, d := range directives {
 		switch d.Kind {
 		case nodes.DirectiveOut, nodes.DirectiveOutRegex, nodes.DirectivePwd, nodes.DirectiveCheckpath:
-			if !CheckDirective(output, d, source, compiledPatterns).Passed {
+			if !CheckDirective(output, d, source, compiledPatterns, ctx).Passed {
 				return false
 			}
 		}
@@ -202,9 +203,9 @@ func checkFastDirectives(output []byte, directives []*nodes.Directive, source []
 
 // checkAllDirectives tests all directives including cmd.
 // Called on ticker to avoid spawning processes too frequently.
-func checkAllDirectives(output []byte, directives []*nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp) bool {
+func checkAllDirectives(output []byte, directives []*nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) bool {
 	for _, d := range directives {
-		if !CheckDirective(output, d, source, compiledPatterns).Passed {
+		if !CheckDirective(output, d, source, compiledPatterns, ctx).Passed {
 			return false
 		}
 	}

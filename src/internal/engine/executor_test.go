@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -250,7 +251,7 @@ func TestCheckDirectives(t *testing.T) {
 				Content: text.NewSegment(0, len(tt.content)),
 			}
 
-			result := CheckDirective(tt.output, directive, source, nil)
+			result := CheckDirective(tt.output, directive, source, nil, nil)
 			if result.Passed != tt.wantPass {
 				t.Errorf("CheckDirective().Passed = %v, want %v", result.Passed, tt.wantPass)
 			}
@@ -273,8 +274,33 @@ func TestCheckDirectiveTypeExpansion(t *testing.T) {
 		t.Fatalf("Precompile failed: %v", err)
 	}
 
-	result := CheckDirective(output, directive, source, patterns)
+	result := CheckDirective(output, directive, source, patterns, nil)
 	if !result.Passed {
 		t.Errorf("Expected output to contain 'Hello 2023-10-25', got failure")
+	}
+}
+
+func TestCheckDirectiveCmdWithEnv(t *testing.T) {
+	ctx, err := NewRunContext()
+	if err != nil {
+		t.Fatalf("failed to create run context: %v", err)
+	}
+	defer ctx.Cleanup()
+
+	// Append environment variable definition to the environment file
+	envData := "export TEST_VAR=my_secret_val\n"
+	if err := os.WriteFile(ctx.MkEnvFile, []byte(envData), 0600); err != nil {
+		t.Fatalf("failed to write to environment file: %v", err)
+	}
+
+	source := []byte(`<!-- cmd [ "$TEST_VAR" = "my_secret_val" ] -->`)
+	directive, ok := nodes.ParseDirective(source, 0)
+	if !ok {
+		t.Fatalf("failed to parse directive")
+	}
+
+	result := CheckDirective(nil, directive, source, nil, ctx)
+	if !result.Passed {
+		t.Errorf("expected cmd directive to pass with env sourced, got error: %v", result.Err)
 	}
 }
