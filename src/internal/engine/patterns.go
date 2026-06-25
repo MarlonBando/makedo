@@ -14,7 +14,7 @@ var TypePatterns = map[string]string{
 	"uuid":    `[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`,
 	"ip":      `\d{1,3}(?:\.\d{1,3}){3}`,
 	"number":  `[-+]?\d*\.?\d+`,
-	"version": `\d+\.\d+\.\d+(?:\.\d+)?`,
+	"version": `\d+\.\d+(?:\.\d+)?(?:\.\d+)?`,
 }
 
 var typePatternRegex = regexp.MustCompile(`\$\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}`)
