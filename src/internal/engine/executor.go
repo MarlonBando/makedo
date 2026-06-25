@@ -78,7 +78,7 @@ func Execute(ctx *RunContext, code string, directives []*nodes.Directive, source
 		close(output)
 	}()
 
-	result := monitor(cmd, output, done, directives, source, stream, compiledPatterns)
+	result := monitor(cmd, output, done, directives, source, stream, compiledPatterns, ctx)
 	result.Warnings = append(result.Warnings, warnings...)
 
 	// If process still running, it stays alive for registry to kill later
@@ -104,7 +104,7 @@ func canEarlyExit(directives []*nodes.Directive) bool {
 
 // TODO: Improve efficiency. We run all the directives when checking. Maybe some directives already passed
 // so technically we shouldn't be checking them. But this is for later.
-func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *Result {
+func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *Result {
 	var buf bytes.Buffer
 	lastActivity := time.Now()
 	ticker := time.NewTicker(TickerInterval)
@@ -116,7 +116,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 	// Immediate initial check of ALL directives (before any output)
 	// This handles cases where directives pass before command produces output
-	if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns) {
+	if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
 		close(done)
 		return &Result{
 			Status:   Ready,
@@ -152,7 +152,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 			// Fast-track: check ONLY fast directives (out, outr, pwd) on output
 			// cmd directives are checked on ticker to avoid spawning too many processes
-			if hasDirectives && !needsCmdCheck && allowEarlyExit && checkFastDirectives(buf.Bytes(), directives, source, compiledPatterns) {
+			if hasDirectives && !needsCmdCheck && allowEarlyExit && checkFastDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
 				close(done)
 				return &Result{
 					Status:   Ready,
@@ -178,7 +178,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 			// Full directive check (includes cmd) on ticker
 			// Runs synchronously - only one cmd process at a time
-			if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns) {
+			if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
 				close(done)
 				return &Result{
 					Status:   Ready,

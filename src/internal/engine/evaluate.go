@@ -35,6 +35,7 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 	if err != nil {
 		outcome.Passed = false
 		outcome.FailReason = fmt.Errorf("failed to precompile directives: %w", err)
+		outcome.ExecResult = &Result{Err: outcome.FailReason, ExitCode: -1}
 		return outcome
 	}
 
@@ -60,7 +61,7 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 	}
 
 	for _, d := range directives {
-		testRes := testDirective(d, execResult, source, lineNum, patterns)
+		testRes := testDirective(d, execResult, source, lineNum, patterns, ctx)
 		if testRes == nil {
 			continue
 		}
@@ -90,7 +91,7 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 }
 
 // testDirective tests a single directive against execution result
-func testDirective(d *nodes.Directive, execResult *Result, source []byte, startLine int, patterns map[*nodes.Directive]*regexp.Regexp) *TestResult {
+func testDirective(d *nodes.Directive, execResult *Result, source []byte, startLine int, patterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *TestResult {
 	// Handle non-zero exit for completed commands
 	if execResult.Status == Completed && execResult.ExitCode != 0 {
 		return &TestResult{
@@ -113,7 +114,7 @@ func testDirective(d *nodes.Directive, execResult *Result, source []byte, startL
 	}
 
 	// Use shared directive checking
-	check := CheckDirective(execResult.Output, d, source, patterns)
+	check := CheckDirective(execResult.Output, d, source, patterns, ctx)
 	return &TestResult{
 		Passed:    check.Passed,
 		StartLine: startLine,
