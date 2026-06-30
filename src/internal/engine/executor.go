@@ -20,12 +20,8 @@ const (
 	bufSize        = 4096
 )
 
-// StallTimeout is the duration of no output before a command is considered stalled.
-// Variable to allow testing with shorter timeouts.
-var StallTimeout = 10 * time.Second
-
 // Execute runs a command with goroutine-based output monitoring.
-// Returns when: command exits, all directives pass, or output stalls.
+// Returns when: command exits, all directives pass.
 func Execute(ctx *RunContext, code string, directives []*nodes.Directive, source []byte, stream bool) *Result {
 	// before every shell execution we load the makedo env file
 	// in this way the user can share varibles
@@ -106,7 +102,6 @@ func canEarlyExit(directives []*nodes.Directive) bool {
 // so technically we shouldn't be checking them. But this is for later.
 func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *Result {
 	var buf bytes.Buffer
-	lastActivity := time.Now()
 	ticker := time.NewTicker(TickerInterval)
 	defer ticker.Stop()
 
@@ -144,7 +139,6 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 			}
 
 			buf.Write(chunk)
-			lastActivity = time.Now()
 
 			if stream {
 				_, _ = os.Stdout.Write(chunk)
@@ -163,19 +157,6 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 			}
 
 		case <-ticker.C:
-			// Stall check
-			if time.Since(lastActivity) > StallTimeout {
-				close(done)
-				// Stalled + no directives = pass (assumed ready)
-				// Stalled + directives not passed = fail (but we return Stalled, caller decides)
-				return &Result{
-					Status:   Stalled,
-					Output:   buf.Bytes(),
-					Process:  cmd.Process,
-					ExitCode: -1,
-				}
-			}
-
 			// Full directive check (includes cmd) on ticker
 			// Runs synchronously - only one cmd process at a time
 			if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {

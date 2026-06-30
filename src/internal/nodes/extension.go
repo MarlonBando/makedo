@@ -39,6 +39,10 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 			return ast.WalkContinue, nil
 		}
 
+		if codeBlock.Lines().Len() == 0 {
+			return ast.WalkContinue, nil
+		}
+
 		lang := codeBlock.Language(source)
 		if !isShellLanguage(lang) {
 			return ast.WalkContinue, nil

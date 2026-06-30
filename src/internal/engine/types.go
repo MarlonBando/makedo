@@ -12,7 +12,6 @@ type Status int
 const (
 	Completed Status = iota // Command exited
 	Ready                   // Directives passed, still running
-	Stalled                 // No output for timeout period
 )
 
 // Result holds command execution result.

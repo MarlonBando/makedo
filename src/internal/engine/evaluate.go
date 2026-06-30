@@ -55,9 +55,6 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 	if execResult.Status == Completed && execResult.ExitCode > 0 {
 		outcome.Passed = false
 		outcome.FailReason = fmt.Errorf("command exited with code %d", execResult.ExitCode)
-	} else if execResult.Status == Stalled && len(directives) > 0 {
-		outcome.Passed = false
-		outcome.FailReason = fmt.Errorf("command stalled before directives passed")
 	}
 
 	for _, d := range directives {

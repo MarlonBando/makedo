@@ -112,9 +112,7 @@ func commandFailed(o *engine.BlockOutcome) bool {
 	if r.Err != nil {
 		return true
 	}
-	if r.Status == engine.Stalled {
-		return true
-	}
+
 	if r.Status == engine.Completed && r.ExitCode != 0 {
 		return true
 	}
@@ -184,11 +182,10 @@ func renderFailurePanel(fb *failedBlock, source []byte) string {
 		switch {
 		case fb.outcome.ExecResult.Err != nil:
 			reason = "error: " + fb.outcome.ExecResult.Err.Error()
-		case fb.outcome.ExecResult.Status == engine.Stalled:
-			reason = "stalled: no output before timeout"
 		case fb.outcome.ExecResult.Status == engine.Completed:
 			reason = fmt.Sprintf("exit %d", fb.outcome.ExecResult.ExitCode)
 		}
+
 		if reason != "" {
 			body.WriteString(failStyle.Render(reason))
 			body.WriteString("\n")

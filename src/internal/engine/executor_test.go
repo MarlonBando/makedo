@@ -61,28 +61,6 @@ func TestExecuteWithOutDirective(t *testing.T) {
 	}
 }
 
-func TestExecuteStallsWithNoOutput(t *testing.T) {
-	// Reduce stall timeout for test
-	oldTimeout := StallTimeout
-	StallTimeout = 500 * time.Millisecond
-	defer func() { StallTimeout = oldTimeout }()
-
-	result := Execute(&RunContext{}, "sleep 10", nil, nil, false)
-
-	if result.Status != Stalled {
-		t.Errorf("expected Stalled, got %v", result.Status)
-	}
-	if result.Process == nil {
-		t.Error("expected process to be set for stalled command")
-	}
-
-	// Clean up
-	if result.Process != nil {
-		result.Process.Kill()
-		result.Process.Wait()
-	}
-}
-
 func TestExecuteLongRunningWithDirective(t *testing.T) {
 	source := []byte("<!-- out ready -->")
 	directive := &nodes.Directive{
@@ -128,7 +106,7 @@ func TestExecuteServerWithCurlDirective(t *testing.T) {
 	}
 
 	start := time.Now()
-	result := Execute(&RunContext{}, 
+	result := Execute(&RunContext{},
 		"python3 -m http.server "+port+" --bind 127.0.0.1 2>&1",
 		[]*nodes.Directive{directive},
 		source,
@@ -155,39 +133,6 @@ func TestExecuteServerWithCurlDirective(t *testing.T) {
 	if result.Process != nil {
 		result.Process.Kill()
 		result.Process.Wait()
-	}
-}
-
-func TestRegistryKillAll(t *testing.T) {
-	registry := NewRegistry()
-
-	// Use short stall timeout
-	oldTimeout := StallTimeout
-	StallTimeout = 200 * time.Millisecond
-	result := Execute(&RunContext{}, "sleep 100", nil, nil, false)
-	StallTimeout = oldTimeout
-
-	if result.Process == nil {
-		t.Fatal("expected stalled process")
-	}
-
-	registry.Add(result.Process)
-
-	// Kill all should terminate the process
-	registry.KillAll()
-
-	// Process should be dead now
-	done := make(chan struct{})
-	go func() {
-		result.Process.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// Good - process was killed
-	case <-time.After(1 * time.Second):
-		t.Error("process was not killed by registry")
 	}
 }
 
