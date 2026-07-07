@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>http://localhost:1313/docs/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/getting-started/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/directives/out/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/directives/cmd/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/directives/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/dynamic-types/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/directives/pwd/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/directives/checkpath/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/environment/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/background-processes/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/directives/skip/</loc>
+  </url><url>
+    <loc>http://localhost:1313/docs/embed-command/</loc>
+  </url><url>
+    <loc>http://localhost:1313/categories/</loc>
+  </url><url>
+    <loc>http://localhost:1313/</loc>
+  </url><url>
+    <loc>http://localhost:1313/tags/</loc>
+  </url>
+</urlset>

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="The checkpath Directive# The checkpath directive asserts that a file or directory exists on the filesystem.
+Check File Exists# touch /tmp/makedo_doc_checkpath.txtCheck Directory Exists# mkdir -p /tmp/makedo_doc_checkdirNegation# Use !checkpath to assert a path does NOT exist:
+echo &#34;checking non-existent path&#34;Cleanup# rm -f /tmp/makedo_doc_checkpath.txt rm -rf /tmp/makedo_doc_checkdir">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#2e3440">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/directives/checkpath/">
+	<meta property="og:site_name" content="MakeDo Documentation">
+	<meta property="og:title" content="checkpath">
+	<meta property="og:description" content="The checkpath Directive# The checkpath directive asserts that a file or directory exists on the filesystem.
+Check File Exists# touch /tmp/makedo_doc_checkpath.txtCheck Directory Exists# mkdir -p /tmp/makedo_doc_checkdirNegation# Use !checkpath to assert a path does NOT exist:
+echo &#34;checking non-existent path&#34;Cleanup# rm -f /tmp/makedo_doc_checkpath.txt rm -rf /tmp/makedo_doc_checkdir">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="docs">
+
+
+	<meta itemprop="name" content="checkpath">
+	<meta itemprop="description" content="The checkpath Directive# The checkpath directive asserts that a file or directory exists on the filesystem.
+Check File Exists# touch /tmp/makedo_doc_checkpath.txtCheck Directory Exists# mkdir -p /tmp/makedo_doc_checkdirNegation# Use !checkpath to assert a path does NOT exist:
+echo &#34;checking non-existent path&#34;Cleanup# rm -f /tmp/makedo_doc_checkpath.txt rm -rf /tmp/makedo_doc_checkdir">
+	<meta itemprop="wordCount" content="45">
+
+<title>checkpath • MakeDo Documentation</title>
+<link rel="icon" href="/favicon.png" >
+<link rel="manifest" href="/manifest.json">
+<link rel="canonical" href="http://localhost:1313/docs/directives/checkpath/">
+<link rel="stylesheet" href="/book.min.64ab3279514b7f9a7b1ec50a47d8bc6f9bed31454a6363d9f98214862cb1a617.css" integrity="sha256-ZKsyeVFLf5p7HsUKR9i8b5vtMUVKY2PZ&#43;YIUhiyxphc=" crossorigin="anonymous">
+
+
+  <script defer type="module" src="/en.search.min.bd319a8016888b3b2718ad226f1e4cf668eaa47303f992cd24e4a424de2709b4.js" integrity="sha256-vTGagBaIizsnGK0ibx5M9mjqpHMD&#43;ZLNJOSkJN4nCbQ=" crossorigin="anonymous"></script>
+
+  
+</head>
+<body dir="ltr" class="book-kind-page book-type-docs">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    
+<aside class="book-menu">
+  <div class="book-menu-content">
+    
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MakeDo Documentation</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input id="book-search-input" type="text" 
+    placeholder="Search"
+    aria-label="Search"
+    maxlength="64" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/getting-started/" class="">
+      Getting Started</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-1b20f8926101bccfbe2a5fa2cb3f3f98" class="toggle" checked />
+    <label for="section-1b20f8926101bccfbe2a5fa2cb3f3f98" class="flex">
+      <a href="/docs/directives/" class="">
+        Directives</a>
+      <img src="/icons/chevron-right.svg" class="book-icon" alt="Expand" />
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/out/" class="">
+      out &amp; outr</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/cmd/" class="">
+      cmd</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/pwd/" class="">
+      pwd</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/checkpath/" class="active">
+      checkpath</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/skip/" class="">
+      skip</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/dynamic-types/" class="">
+      Dynamic Types</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/environment/" class="">
+      Environment &amp; State</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/background-processes/" class="">
+      Background Processes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/embed-command/" class="">
+      Embed Command</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+
+  </div>
+</aside>
+ 
+
+    <div class="book-page">
+      <header class="book-header hidden">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/icons/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <h3>checkpath</h3>
+
+  <label for="toc-control">
+    
+    <img src="/icons/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#check-file-exists">Check File Exists</a></li>
+    <li><a href="#check-directory-exists">Check Directory Exists</a></li>
+    <li><a href="#negation">Negation</a></li>
+    <li><a href="#cleanup">Cleanup</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="the-checkpath-directive">The <code>checkpath</code> Directive<a class="anchor" href="#the-checkpath-directive">#</a></h1>
+<p>The <code>checkpath</code> directive asserts that a file or directory exists on the filesystem.</p>
+<h2 id="check-file-exists">Check File Exists<a class="anchor" href="#check-file-exists">#</a></h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>touch /tmp/makedo_doc_checkpath.txt</span></span></code></pre></div><h2 id="check-directory-exists">Check Directory Exists<a class="anchor" href="#check-directory-exists">#</a></h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>mkdir -p /tmp/makedo_doc_checkdir</span></span></code></pre></div><h2 id="negation">Negation<a class="anchor" href="#negation">#</a></h2>
+<p>Use <code>!checkpath</code> to assert a path does NOT exist:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>echo <span style="color:#e6db74">&#34;checking non-existent path&#34;</span></span></span></code></pre></div><h2 id="cleanup">Cleanup<a class="anchor" href="#cleanup">#</a></h2>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>rm -f /tmp/makedo_doc_checkpath.txt
+</span></span><span style="display:flex;"><span>rm -rf /tmp/makedo_doc_checkdir</span></span></code></pre></div></article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+<div>
+
+</div>
+
+<div>
+
+</div>
+
+</div>
+
+<div class="flex flex-wrap justify-between">
+    <span>
+    
+      <a href="/docs/directives/pwd/" class="flex align-center">
+        <img src="/icons/backward.svg" class="book-icon" alt="Backward" />
+        <span>pwd</span>
+      </a>
+    
+    </span>
+    <span>
+    
+      <a href="/docs/directives/skip/" class="flex align-center">
+        <span>skip</span>
+        <img src="/icons/forward.svg" class="book-icon" alt="Forward" />
+      </a>
+    
+    </span>
+  </div>
+
+ 
+        
+  
+ 
+        
+        
+  
+ 
+        
+  
+    <script>(function(){document.querySelectorAll("pre:has(code)").forEach(e=>{e.addEventListener("click",e.focus),e.addEventListener("copy",function(t){if(t.preventDefault(),navigator.clipboard){const t=window.getSelection().toString()||e.textContent;navigator.clipboard.writeText(t)}})})})()</script>
+  
+
+      </footer>
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+  
+  <aside class="book-toc">
+    <div class="book-toc-content">
+      
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#check-file-exists">Check File Exists</a></li>
+    <li><a href="#check-directory-exists">Check Directory Exists</a></li>
+    <li><a href="#negation">Negation</a></li>
+    <li><a href="#cleanup">Cleanup</a></li>
+  </ul>
+</nav>
+
+
+
+    </div>
+  </aside>
+  
+ 
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

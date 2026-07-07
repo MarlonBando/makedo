@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en-us" dir="ltr">
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+  <!--
+Made with Book Theme
+https://github.com/alex-shpak/hugo-book
+-->
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Background Processes# MakeDo automatically manages background processes. When a code block with directives passes its checks before the command exits, MakeDo keeps the command running in the background for subsequent blocks to use.
+How It Works# Start: The shell command is started as a new process group Continuous Evaluation: As output arrives, MakeDo evaluates directives continuously Ready State: If all directives pass before the command exits, MakeDo moves on to the next block while leaving the command running Automatic Cleanup: At the end of the document, MakeDo kills all background processes Example: Starting a Server# You can start a long-running server and immediately use it in the next block:
+">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#2e3440">
+<meta name="color-scheme" content="light dark"><meta property="og:url" content="http://localhost:1313/docs/background-processes/">
+	<meta property="og:site_name" content="MakeDo Documentation">
+	<meta property="og:title" content="Background Processes">
+	<meta property="og:description" content="Background Processes# MakeDo automatically manages background processes. When a code block with directives passes its checks before the command exits, MakeDo keeps the command running in the background for subsequent blocks to use.
+How It Works# Start: The shell command is started as a new process group Continuous Evaluation: As output arrives, MakeDo evaluates directives continuously Ready State: If all directives pass before the command exits, MakeDo moves on to the next block while leaving the command running Automatic Cleanup: At the end of the document, MakeDo kills all background processes Example: Starting a Server# You can start a long-running server and immediately use it in the next block:">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="article">
+		<meta property="article:section" content="docs">
+
+
+	<meta itemprop="name" content="Background Processes">
+	<meta itemprop="description" content="Background Processes# MakeDo automatically manages background processes. When a code block with directives passes its checks before the command exits, MakeDo keeps the command running in the background for subsequent blocks to use.
+How It Works# Start: The shell command is started as a new process group Continuous Evaluation: As output arrives, MakeDo evaluates directives continuously Ready State: If all directives pass before the command exits, MakeDo moves on to the next block while leaving the command running Automatic Cleanup: At the end of the document, MakeDo kills all background processes Example: Starting a Server# You can start a long-running server and immediately use it in the next block:">
+	<meta itemprop="wordCount" content="206">
+
+<title>Background Processes • MakeDo Documentation</title>
+<link rel="icon" href="/favicon.png" >
+<link rel="manifest" href="/manifest.json">
+<link rel="canonical" href="http://localhost:1313/docs/background-processes/">
+<link rel="stylesheet" href="/book.min.64ab3279514b7f9a7b1ec50a47d8bc6f9bed31454a6363d9f98214862cb1a617.css" integrity="sha256-ZKsyeVFLf5p7HsUKR9i8b5vtMUVKY2PZ&#43;YIUhiyxphc=" crossorigin="anonymous">
+
+
+  <script defer type="module" src="/en.search.min.bd319a8016888b3b2718ad226f1e4cf668eaa47303f992cd24e4a424de2709b4.js" integrity="sha256-vTGagBaIizsnGK0ibx5M9mjqpHMD&#43;ZLNJOSkJN4nCbQ=" crossorigin="anonymous"></script>
+
+  
+</head>
+<body dir="ltr" class="book-kind-page book-type-docs">
+  <input type="checkbox" class="hidden toggle" id="menu-control" />
+  <input type="checkbox" class="hidden toggle" id="toc-control" />
+  <main class="container flex">
+    
+<aside class="book-menu">
+  <div class="book-menu-content">
+    
+  <nav>
+<h2 class="book-brand">
+  <a class="flex align-center" href="/"><span>MakeDo Documentation</span>
+  </a>
+</h2>
+
+
+<div class="book-search hidden">
+  <input id="book-search-input" type="text" 
+    placeholder="Search"
+    aria-label="Search"
+    maxlength="64" />
+  <div class="book-search-spinner hidden"></div>
+  <ul id="book-search-results"></ul>
+</div>
+<script>document.querySelector(".book-search").classList.remove("hidden")</script>
+
+
+
+
+
+
+
+
+
+
+  
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/getting-started/" class="">
+      Getting Started</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <input type="checkbox" id="section-1b20f8926101bccfbe2a5fa2cb3f3f98" class="toggle"  />
+    <label for="section-1b20f8926101bccfbe2a5fa2cb3f3f98" class="flex">
+      <a href="/docs/directives/" class="">
+        Directives</a>
+      <img src="/icons/chevron-right.svg" class="book-icon" alt="Expand" />
+    </label>
+  
+
+          
+  <ul>
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/out/" class="">
+      out &amp; outr</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/cmd/" class="">
+      cmd</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/pwd/" class="">
+      pwd</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/checkpath/" class="">
+      checkpath</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/directives/skip/" class="">
+      skip</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/dynamic-types/" class="">
+      Dynamic Types</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/environment/" class="">
+      Environment &amp; State</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/background-processes/" class="active">
+      Background Processes</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/docs/embed-command/" class="">
+      Embed Command</a>
+  
+
+        </li>
+      
+    
+  </ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</nav>
+
+
+
+
+  <script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script>
+
+
+
+  </div>
+</aside>
+ 
+
+    <div class="book-page">
+      <header class="book-header hidden">
+        
+  <div class="flex align-center justify-between">
+  <label for="menu-control">
+    <img src="/icons/menu.svg" class="book-icon" alt="Menu" />
+  </label>
+
+  <h3>Background Processes</h3>
+
+  <label for="toc-control">
+    
+    <img src="/icons/toc.svg" class="book-icon" alt="Table of Contents" />
+    
+  </label>
+</div>
+
+
+  
+  <aside class="hidden">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#example-starting-a-server">Example: Starting a Server</a></li>
+    <li><a href="#stall-detection">Stall Detection</a></li>
+    <li><a href="#background-operator-warning">Background Operator Warning</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
+  
+ 
+      </header>
+
+      
+      
+  <article class="markdown book-article"><h1 id="background-processes">Background Processes<a class="anchor" href="#background-processes">#</a></h1>
+<p>MakeDo automatically manages background processes. When a code block with directives passes its checks before the command exits, MakeDo keeps the command running in the background for subsequent blocks to use.</p>
+<h2 id="how-it-works">How It Works<a class="anchor" href="#how-it-works">#</a></h2>
+<ol>
+<li><strong>Start</strong>: The shell command is started as a new process group</li>
+<li><strong>Continuous Evaluation</strong>: As output arrives, MakeDo evaluates directives continuously</li>
+<li><strong>Ready State</strong>: If all directives pass before the command exits, MakeDo moves on to the next block while leaving the command running</li>
+<li><strong>Automatic Cleanup</strong>: At the end of the document, MakeDo kills all background processes</li>
+</ol>
+<h2 id="example-starting-a-server">Example: Starting a Server<a class="anchor" href="#example-starting-a-server">#</a></h2>
+<p>You can start a long-running server and immediately use it in the next block:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>python3 -m http.server <span style="color:#ae81ff">8877</span> 2&gt;&amp;<span style="color:#ae81ff">1</span></span></span></code></pre></div><p>The server is now running. You can interact with it:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>curl -s -o /dev/null -w <span style="color:#e6db74">&#34;%{http_code}&#34;</span> http://localhost:8877</span></span></code></pre></div><p>At the end of this page, MakeDo automatically kills the server.</p>
+<h2 id="stall-detection">Stall Detection<a class="anchor" href="#stall-detection">#</a></h2>
+<p>If a command produces no output for 10 seconds (the default <code>StallTimeout</code>), it is marked as <strong>Stalled</strong>. If the block had directives that haven&rsquo;t passed yet, this results in a test failure.</p>
+<h2 id="background-operator-warning">Background Operator Warning<a class="anchor" href="#background-operator-warning">#</a></h2>
+<p>MakeDo manages background processes automatically based on directive satisfaction. Using the shell <code>&amp;</code> operator manually is <strong>discouraged</strong>. If MakeDo detects a lone <code>&amp;</code> operator, it will issue a warning.</p>
+</article>
+ 
+      
+
+      <footer class="book-footer">
+        
+  <div class="flex flex-wrap justify-between">
+
+<div>
+
+</div>
+
+<div>
+
+</div>
+
+</div>
+
+<div class="flex flex-wrap justify-between">
+    <span>
+    
+      <a href="/docs/environment/" class="flex align-center">
+        <img src="/icons/backward.svg" class="book-icon" alt="Backward" />
+        <span>Environment &amp; State</span>
+      </a>
+    
+    </span>
+    <span>
+    
+      <a href="/docs/embed-command/" class="flex align-center">
+        <span>Embed Command</span>
+        <img src="/icons/forward.svg" class="book-icon" alt="Forward" />
+      </a>
+    
+    </span>
+  </div>
+
+ 
+        
+  
+ 
+        
+        
+  
+ 
+        
+  
+    <script>(function(){document.querySelectorAll("pre:has(code)").forEach(e=>{e.addEventListener("click",e.focus),e.addEventListener("copy",function(t){if(t.preventDefault(),navigator.clipboard){const t=window.getSelection().toString()||e.textContent;navigator.clipboard.writeText(t)}})})})()</script>
+  
+
+      </footer>
+
+      <label for="menu-control" class="hidden book-menu-overlay"></label>
+    </div>
+
+    
+  
+  <aside class="book-toc">
+    <div class="book-toc-content">
+      
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#example-starting-a-server">Example: Starting a Server</a></li>
+    <li><a href="#stall-detection">Stall Detection</a></li>
+    <li><a href="#background-operator-warning">Background Operator Warning</a></li>
+  </ul>
+</nav>
+
+
+
+    </div>
+  </aside>
+  
+ 
+  </main>
+
+  
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
