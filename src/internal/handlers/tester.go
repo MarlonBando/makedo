@@ -38,7 +38,6 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 	var passedTests int
 	var failedTests int
 	var failedBlocks = make([]*failedBlock, 0, bytes.Count(source, []byte("\n```"))/2)
-	var setupErr error
 
 	walkErr := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -64,21 +63,20 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdPath, startLine, warn))
 		}
 
-		// Setup block (no directives): doesn't count as a test, but
-		// still gets a panel on failure and aborts the walk.
+		// Directiveless block: counts as a single test that checks the exit code.
 		if len(directives) == 0 {
-			if !outcome.Passed {
-				fb := &failedBlock{
+			if outcome.Passed {
+				passedTests++
+				progressMark(true)
+			} else {
+				failedTests++
+				progressMark(false)
+				failedBlocks = append(failedBlocks, &failedBlock{
 					mdPath:    mdPath,
 					startLine: startLine,
 					block:     block,
 					outcome:   outcome,
-					isSetup:   true,
-				}
-				failedBlocks = append(failedBlocks, fb)
-				progressMark(false)
-				setupErr = fmt.Errorf("setup block at line %d failed: %w", startLine, outcome.FailReason)
-				return ast.WalkStop, nil
+				})
 			}
 			return ast.WalkContinue, nil
 		}
@@ -144,9 +142,6 @@ func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
 	total := passedTests + failedTests
 	renderSummary(passedTests, total, len(failedBlocks))
 
-	if setupErr != nil {
-		return setupErr
-	}
 	if failedTests > 0 {
 		return fmt.Errorf("%d test(s) failed", failedTests)
 	}

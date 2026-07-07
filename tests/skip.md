@@ -46,7 +46,7 @@ EOF
 
 makedo test /tmp/makedo_skip_case_3.md
 ````
-<!-- out 0/0 tests passed -->
+<!-- out 1/1 tests passed -->
 <!-- cmd test -f /tmp/makedo_skip_case_3.out -->
 
 ## Cleanup
