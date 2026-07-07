@@ -1,0 +1,55 @@
+baseURL = 'https://example.com/'
+languageCode = 'en-us'
+title = 'MakeDo Documentation'
+theme = 'hugo-book'
+
+# Book configuration
+[params]
+  # (Optional, default light) Sets color theme: light, dark or auto.
+  # Theme 'auto' switches between dark and light modes based on browser/os settings
+  BookTheme = 'auto'
+
+  # (Optional, default true) Controls table of contents visibility on right side of pages.
+  BookToC = true
+
+  # (Optional, default none) Set the path to a logo for the book. If the logo is
+  # /static/logo.png then the path would be logo.png
+  # BookLogo = 'logo.png'
+
+  # (Optional, default docs) Specify root page to render child pages as menu.
+  BookSection = 'docs'
+
+  # Set source repository location.
+  # Used for 'Last Modified' and 'Edit this page' links.
+  # BookRepo = 'https://github.com/your-user/makedo'
+
+  # Specify section of content to render as menu
+  # You can also set value to '*' to render all sections to menu
+  BookMenuBundle = '/menu'
+
+  # (Optional, default January 2, 2006) Configure the date format used on the pages
+  # - In git information
+  # - In blog posts
+  BookDateFormat = 'Jan 2, 2006'
+
+  # (Optional, default true) Enables search function with flexsearch,
+  # Index is built on fly, therefore it might slowdown your website.
+  BookSearch = true
+
+  # (Optional, default true) Enables comments template on pages
+  # By default partials/docs/comments.html includes Disqus template
+  # See https://gohugo.io/content-management/comments/#configure-disqus
+  # Can be overwritten by same param in page frontmatter
+  BookComments = false
+
+  # /!\ This is an experimental feature, might be removed in the future
+  # (Optional, experimental, default false) Enables portable links and target for
+  # temporary local navigation from file browser
+  BookPortableLinks = true
+
+[markup]
+  [markup.highlight]
+    style = 'monokai'
+    lineNos = false
+    codeFences = true
+    guessSyntax = true
