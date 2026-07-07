@@ -33,7 +33,7 @@ type failedBlock struct {
 	startLine int
 	block     *nodes.MakeDoCodeBlock
 	outcome   *engine.BlockOutcome
-	isSetup   bool // no directives
+
 }
 
 // codeRenderer is a glamour renderer stripped of outer padding/margins,
@@ -123,9 +123,6 @@ func commandFailed(o *engine.BlockOutcome) bool {
 func renderFailurePanel(fb *failedBlock, source []byte) string {
 	var header strings.Builder
 	headerLine := fmt.Sprintf("FAIL %s:%d", fb.mdPath, fb.startLine)
-	if fb.isSetup {
-		headerLine += "  (setup)"
-	}
 	header.WriteString(headerStyle.Render(headerLine))
 	header.WriteString("\n")
 
