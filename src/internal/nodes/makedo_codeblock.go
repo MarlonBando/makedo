@@ -100,6 +100,13 @@ func (n *MakeDoCodeBlock) Code(source []byte) []byte {
 	}
 
 	var buf bytes.Buffer
+	// if we have
+	// ```bash
+	// $ my-command
+	// my-command-output
+	// ```
+	// inCommands true we are reading the code ($ my-command)
+	// inCommands false we are reading the stdout (my-command-output)
 	inCommands := n.consoleFormat
 	for i := 0; i < lines.Len(); i++ {
 		seg := lines.At(i)
