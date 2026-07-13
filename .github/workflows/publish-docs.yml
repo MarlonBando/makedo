@@ -3,6 +3,8 @@ name: Deploy Hugo site to Pages
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +30,27 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build makedo
+        run: |
+          cd src
+          go mod tidy
+          go build -ldflags "-X main.versionString=$(cat ../VERSION)" -o ../bin/makedo
+          echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
+
+      - name: Run Docs Tests
+        run: |
+          shopt -s globstar
+          # Loop through all markdown files in the docs/content/ folder
+          for doc_file in docs/content/**/*.md; do
+            echo "Running tests in $doc_file"
+            makedo test "$doc_file"
+          done
+
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
         with:
@@ -43,14 +66,17 @@ jobs:
 
       - name: Setup Pages
         id: pages
+        if: github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs/public
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
