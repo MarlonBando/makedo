@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/yuin/goldmark/ast"
@@ -14,15 +15,23 @@ var KindMakeDoCodeBlock = ast.NewNodeKind("MakeDoCodeBlock")
 // It combines a code block with parsed comment directives that follow it.
 type MakeDoCodeBlock struct {
 	ast.BaseBlock
-	language    []byte
-	info        *ast.Text
-	directives  []*Directive
-	outputBlock *ast.FencedCodeBlock
+	language      []byte
+	info          *ast.Text
+	directives    []*Directive
+	outputBlock   *ast.FencedCodeBlock
+	consoleFormat bool
+}
+
+// IsConsoleCommand checks if a line represents a console command in the dollar format.
+// It returns true if the line starts with '$' but explicitly ignores lines starting
+// with '${{' to prevent confusing template/generalized output with a shell prompt.
+func IsConsoleCommand(line []byte) bool {
+	return bytes.HasPrefix(line, []byte("$")) && !bytes.HasPrefix(line, []byte("${{"))
 }
 
 // NewMakeDoCodeBlock creates a MakeDoCodeBlock from a FencedCodeBlock.
-// It copies the essential properties and line segments.
-func NewMakeDoCodeBlock(codeBlock *ast.FencedCodeBlock) *MakeDoCodeBlock {
+// It copies the essential properties and line segments and determines if it is Console Format.
+func NewMakeDoCodeBlock(codeBlock *ast.FencedCodeBlock, source []byte) *MakeDoCodeBlock {
 	n := &MakeDoCodeBlock{
 		info:       codeBlock.Info,
 		directives: make([]*Directive, 0, 2),
@@ -30,6 +39,15 @@ func NewMakeDoCodeBlock(codeBlock *ast.FencedCodeBlock) *MakeDoCodeBlock {
 	// Copy lines from original code block
 	lines := codeBlock.Lines()
 	n.SetLines(lines)
+
+	if lines.Len() > 0 {
+		seg := lines.At(0)
+		firstLine := bytes.TrimSpace(seg.Value(source))
+		if IsConsoleCommand(firstLine) {
+			n.consoleFormat = true
+		}
+	}
+
 	return n
 }
 
@@ -41,6 +59,11 @@ func (n *MakeDoCodeBlock) OutputBlock() *ast.FencedCodeBlock {
 // SetOutputBlock sets the stdout output block associated with this code block.
 func (n *MakeDoCodeBlock) SetOutputBlock(b *ast.FencedCodeBlock) {
 	n.outputBlock = b
+}
+
+// IsConsoleFormat returns true if this block uses the dollar-sign prompt format.
+func (n *MakeDoCodeBlock) IsConsoleFormat() bool {
+	return n.consoleFormat
 }
 
 // Kind returns the NodeKind for MakeDoCodeBlock.
@@ -76,19 +99,27 @@ func (n *MakeDoCodeBlock) Code(source []byte) []byte {
 		return nil
 	}
 
-	// Calculate total length for pre-allocation
-	var totalLen int
+	var buf bytes.Buffer
 	for i := 0; i < lines.Len(); i++ {
-		line := lines.At(i)
-		totalLen += line.Len()
+		seg := lines.At(i)
+		line := seg.Value(source)
+		if n.consoleFormat {
+			trimmed := bytes.TrimSpace(line)
+			if IsConsoleCommand(trimmed) {
+				cmd := trimmed[1:]
+				if len(cmd) > 0 && (cmd[0] == ' ' || cmd[0] == '\t') {
+					cmd = cmd[1:]
+				}
+				buf.Write(cmd)
+				buf.WriteByte('\n')
+			} else {
+				break
+			}
+		} else {
+			buf.Write(line)
+		}
 	}
-
-	result := make([]byte, 0, totalLen)
-	for i := 0; i < lines.Len(); i++ {
-		line := lines.At(i)
-		result = append(result, line.Value(source)...)
-	}
-	return result
+	return buf.Bytes()
 }
 
 // Directives returns all directives associated with this code block.

@@ -99,7 +99,7 @@ func (t *MakeDoTransformer) Transform(node *ast.Document, reader text.Reader, pc
 
 	// Apply transformations
 	for _, tr := range transformations {
-		makedo := NewMakeDoCodeBlock(tr.codeBlock)
+		makedo := NewMakeDoCodeBlock(tr.codeBlock, source)
 		for _, d := range tr.directives {
 			makedo.AddDirective(d)
 		}

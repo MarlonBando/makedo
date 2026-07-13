@@ -83,8 +83,6 @@ func EmbedMarkdownFile(mdFile string, ctx *engine.RunContext) error {
 			}
 		}
 
-		buf = append(buf, source[lastPos:blockEnd]...)
-
 		code := string(block.Code(source))
 		lineNum := lineNumber(source, block.Lines().At(0).Start)
 
@@ -94,62 +92,98 @@ func EmbedMarkdownFile(mdFile string, ctx *engine.RunContext) error {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdFile, lineNum, warn))
 		}
 
-		if !outcome.Passed {
-			failReason := outcome.FailReason.Error()
-			fmt.Printf("[WARN] Block at line %d failed (%s), skipping output update\n", lineNum, failReason)
-			failed++
+		var prefix, oldOutputBytes, newOutputBytes, suffix []byte
+		var nextPos int
 
-			// Keep existing output block if present
+		if block.IsConsoleFormat() {
+			blockStart := lines.At(0).Start
+			prefix = make([]byte, 0, (blockStart-lastPos)+lines.Len()*20)
+			prefix = append(prefix, source[lastPos:blockStart]...)
+
+			var oldOutput bytes.Buffer
+			inCommands := true
+			for i := 0; i < lines.Len(); i++ {
+				seg := lines.At(i)
+				line := seg.Value(source)
+				trimmed := bytes.TrimSpace(line)
+				if inCommands && nodes.IsConsoleCommand(trimmed) {
+					prefix = append(prefix, line...)
+				} else {
+					inCommands = false
+					oldOutput.Write(line)
+				}
+			}
+
+			oldOutputBytes = oldOutput.Bytes()
+
+			finalOutput := outcome.FinalOutput
+			if len(finalOutput) > 0 {
+				newOutputBytes = append([]byte(nil), finalOutput...)
+				if finalOutput[len(finalOutput)-1] != '\n' {
+					newOutputBytes = append(newOutputBytes, '\n')
+				}
+			}
+
+			suffix = source[lastLineEnd:blockEnd]
+			nextPos = blockEnd
+
+			if outBlock := block.OutputBlock(); outBlock != nil {
+				end := outBlock.Lines().At(outBlock.Lines().Len() - 1).Stop
+				nextPos = end + bytes.IndexByte(source[end:], '\n') + 1
+			}
+		} else {
+			prefix = source[lastPos:blockEnd]
+			nextPos = blockEnd
+
 			if outBlock := block.OutputBlock(); outBlock != nil {
 				start := outBlock.Lines().At(0).Start
 				start = bytes.LastIndexByte(source[:start-1], '\n') + 1
 				end := outBlock.Lines().At(outBlock.Lines().Len() - 1).Stop
 				end = end + bytes.IndexByte(source[end:], '\n') + 1
-				buf = append(buf, source[start:end]...)
-				lastPos = end
-			} else {
-				lastPos = blockEnd
+				oldOutputBytes = source[start:end]
+				nextPos = end
 			}
-			continue
-		}
 
-		// Use the FinalOutput calculated by the EvaluateBlock which already handled Substitutions
-		finalOutput := string(outcome.FinalOutput)
-
-		var newOutput string
-		if len(finalOutput) > 0 || len(directives) > 0 {
-			newOutput = fmt.Sprintf("\n```stdout\n%s\n```\n", finalOutput)
-		} else {
-			// If there's literally no output and no directives, we probably don't even need a stdout block?
-			// But for consistency let's preserve the original behavior which printed it if string(finalOutput) wasn't completely empty after trim.
-			// Let's just follow the original logic which allowed empty blocks if we appended them.
-			newOutput = fmt.Sprintf("\n```stdout\n%s\n```\n", finalOutput)
-		}
-
-		if outBlock := block.OutputBlock(); outBlock != nil {
-			// Extract old output content
-			start := outBlock.Lines().At(0).Start
-			start = bytes.LastIndexByte(source[:start-1], '\n') + 1
-			end := outBlock.Lines().At(outBlock.Lines().Len() - 1).Stop
-			end = end + bytes.IndexByte(source[end:], '\n') + 1
-
-			oldOutput := string(source[start:end])
-
-			if strings.TrimSpace(oldOutput) == strings.TrimSpace(newOutput) {
-				unchanged++
-				buf = append(buf, oldOutput...) // preserve exact original if unchanged
-			} else {
-				updated++
-				buf = append(buf, newOutput...)
+			finalOutput := string(outcome.FinalOutput)
+			if len(finalOutput) > 0 || block.OutputBlock() != nil {
+				newOutputBytes = []byte(fmt.Sprintf("\n```stdout\n%s\n```\n", finalOutput))
 			}
-			lastPos = end
-		} else if len(finalOutput) > 0 {
-			added++
-			buf = append(buf, newOutput...)
-			lastPos = blockEnd
-		} else {
-			lastPos = blockEnd
 		}
+
+		if !outcome.Passed {
+			failReason := outcome.FailReason.Error()
+			fmt.Printf("[WARN] Block at line %d failed (%s), skipping output update\n", lineNum, failReason)
+			failed++
+
+			buf = append(buf, prefix...)
+			if len(oldOutputBytes) > 0 {
+				buf = append(buf, oldOutputBytes...)
+			}
+			buf = append(buf, suffix...)
+		} else {
+			buf = append(buf, prefix...)
+
+			isUnchanged := bytes.Equal(bytes.TrimSpace(oldOutputBytes), bytes.TrimSpace(newOutputBytes))
+
+			if len(oldOutputBytes) > 0 {
+				if isUnchanged {
+					unchanged++
+					buf = append(buf, oldOutputBytes...)
+				} else {
+					updated++
+					buf = append(buf, newOutputBytes...)
+				}
+			} else {
+				if len(newOutputBytes) > 0 {
+					added++
+					buf = append(buf, newOutputBytes...)
+				}
+			}
+
+			buf = append(buf, suffix...)
+		}
+
+		lastPos = nextPos
 	}
 
 	// Write any remaining text
