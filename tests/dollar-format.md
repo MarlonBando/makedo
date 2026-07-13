@@ -27,6 +27,7 @@ $ echo "Hello world x2"
 Hello world 
 ```
 <!-- out Hello world -->
+<!-- out Hello world x2 -->
 
 
 The dollar format works if we see a dollar as first non white character
