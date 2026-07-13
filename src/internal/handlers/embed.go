@@ -83,8 +83,6 @@ func EmbedMarkdownFile(mdFile string, ctx *engine.RunContext) error {
 			}
 		}
 
-		buf = append(buf, source[lastPos:blockEnd]...)
-
 		code := string(block.Code(source))
 		lineNum := lineNumber(source, block.Lines().At(0).Start)
 
@@ -93,6 +91,61 @@ func EmbedMarkdownFile(mdFile string, ctx *engine.RunContext) error {
 		for _, warn := range outcome.ExecResult.Warnings {
 			allWarnings = append(allWarnings, fmt.Sprintf("%s:%d: %v", mdFile, lineNum, warn))
 		}
+
+		if block.IsConsoleFormat() {
+			blockStart := lines.At(0).Start
+			buf = append(buf, source[lastPos:blockStart]...)
+
+			var oldOutput bytes.Buffer
+			var newCommandBlock bytes.Buffer
+			inCommands := true
+			for i := 0; i < lines.Len(); i++ {
+				seg := lines.At(i)
+				line := seg.Value(source)
+				trimmed := bytes.TrimSpace(line)
+				if inCommands && nodes.IsConsoleCommand(trimmed) {
+					newCommandBlock.Write(line)
+				} else {
+					inCommands = false
+					oldOutput.Write(line)
+				}
+			}
+
+			if !outcome.Passed {
+				failReason := outcome.FailReason.Error()
+				fmt.Printf("[WARN] Block at line %d failed (%s), skipping output update\n", lineNum, failReason)
+				failed++
+				buf = append(buf, newCommandBlock.Bytes()...)
+				buf = append(buf, oldOutput.Bytes()...)
+			} else {
+				buf = append(buf, newCommandBlock.Bytes()...)
+				finalOutput := outcome.FinalOutput
+				if len(finalOutput) > 0 {
+					buf = append(buf, finalOutput...)
+					if finalOutput[len(finalOutput)-1] != '\n' {
+						buf = append(buf, '\n')
+					}
+				}
+
+				if bytes.Equal(bytes.TrimSpace(oldOutput.Bytes()), bytes.TrimSpace(finalOutput)) {
+					unchanged++
+				} else {
+					updated++
+				}
+			}
+
+			buf = append(buf, source[lastLineEnd:blockEnd]...)
+			lastPos = blockEnd
+
+			if outBlock := block.OutputBlock(); outBlock != nil {
+				end := outBlock.Lines().At(outBlock.Lines().Len() - 1).Stop
+				end = end + bytes.IndexByte(source[end:], '\n') + 1
+				lastPos = end
+			}
+			continue
+		}
+
+		buf = append(buf, source[lastPos:blockEnd]...)
 
 		if !outcome.Passed {
 			failReason := outcome.FailReason.Error()
