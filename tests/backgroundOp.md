@@ -12,8 +12,7 @@ EOF
 sed -i 's/AMPERSAND_TOKEN/\&/g' test1.md
 bin/makedo test test1.md
 ````
-<!-- out Warnings: -->
-<!-- out detected & in block! -->
+<!-- !out Warnings: -->
 
 
 ### Test 2: Background op in the middle
@@ -28,8 +27,7 @@ EOF
 sed -i 's/AMPERSAND_TOKEN/\&/g' test2.md
 bin/makedo test test2.md
 ````
-<!-- out Warnings: -->
-<!-- out detected & in block! -->
+<!-- !out Warnings: -->
 
 
 ### Test 3: `&` in a string should NOT warn

@@ -126,3 +126,4 @@ Use `\s` for whitespace, `\t` for tabs.
 echo "hello   world"
 ```
 <!-- outr hello\s+world -->
+

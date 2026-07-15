@@ -1,39 +1,77 @@
 package engine
 
 import (
-	"fmt"
+	"bufio"
+	"io"
 	"os"
-	"path/filepath"
+	"os/exec"
 )
 
 type RunContext struct {
-	MkTmpDir  string
-	MkEnvFile string
-	Registry  *Registry
+	Registry     *Registry
+	ShellCmd     *exec.Cmd
+	Stdin        io.WriteCloser
+	Stdout       io.ReadCloser
+	StdoutReader *bufio.Reader
+	Cwd          string
+	EnvFile      string
+	waitDone     chan struct{}
 }
 
 func NewRunContext() (*RunContext, error) {
-	tmpDir, err := os.MkdirTemp("", "makedo-env-")
+	cmd := exec.Command("bash")
+
+	// Create a single pipe for both stdout and stderr
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stdout = pw
+	cmd.Stderr = pw
+
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
 
-	mkEnvFile := filepath.Join(tmpDir, ".mkenv")
-	envContent := fmt.Sprintf("MAKEDO_ENV='%s'\n", mkEnvFile)
-	err = os.WriteFile(mkEnvFile, []byte(envContent), 0600)
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+
+	// We need to wait for the command to finish so we can close the write end of the pipe
+	waitDone := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		pw.Close()
+		close(waitDone)
+	}()
+
+	cwd, _ := os.Getwd()
 
 	return &RunContext{
-		MkTmpDir:  tmpDir,
-		MkEnvFile: mkEnvFile,
-		Registry:  NewRegistry(),
+		Registry:     NewRegistry(),
+		ShellCmd:     cmd,
+		Stdin:        stdin,
+		Stdout:       pr,
+		StdoutReader: bufio.NewReader(pr),
+		Cwd:          cwd,
+		waitDone:     waitDone,
 	}, nil
 }
 
 func (ctx *RunContext) Cleanup() {
-	os.RemoveAll(ctx.MkTmpDir)
+	if ctx.Stdin != nil {
+		ctx.Stdin.Close()
+	}
+	if ctx.ShellCmd != nil && ctx.ShellCmd.Process != nil {
+		ctx.ShellCmd.Process.Kill()
+	}
+	if ctx.waitDone != nil {
+		<-ctx.waitDone
+	}
+	if ctx.Stdout != nil {
+		ctx.Stdout.Close()
+	}
 	if ctx.Registry != nil {
 		ctx.Registry.KillAll()
 	}

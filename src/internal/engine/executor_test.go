@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,9 @@ import (
 )
 
 func TestExecuteFastCommand(t *testing.T) {
-	result := Execute(&RunContext{}, "echo hello", nil, nil, false)
+	ctx, _ := NewRunContext()
+	defer ctx.Cleanup()
+	result := Execute(ctx, "echo hello", nil, nil, false)
 
 	if result.Status != Completed {
 		t.Errorf("expected Completed, got %v", result.Status)
@@ -27,7 +30,9 @@ func TestExecuteFastCommand(t *testing.T) {
 }
 
 func TestExecuteCommandWithNonZeroExit(t *testing.T) {
-	result := Execute(&RunContext{}, "exit 42", nil, nil, false)
+	ctx, _ := NewRunContext()
+	defer ctx.Cleanup()
+	result := Execute(ctx, "sh -c 'exit 42'", nil, nil, false)
 
 	if result.Status != Completed {
 		t.Errorf("expected Completed, got %v", result.Status)
@@ -44,7 +49,9 @@ func TestExecuteWithOutDirective(t *testing.T) {
 		Content: text.NewSegment(9, 14), // "hello"
 	}
 
-	result := Execute(&RunContext{}, "echo hello world", []*nodes.Directive{directive}, source, false)
+	ctx, _ := NewRunContext()
+	defer ctx.Cleanup()
+	result := Execute(ctx, "echo hello world", []*nodes.Directive{directive}, source, false)
 
 	// Can be either Completed (if command exits before we check) or Ready (if directive passes first)
 	if result.Status != Completed && result.Status != Ready {
@@ -71,7 +78,10 @@ func TestExecuteLongRunningWithDirective(t *testing.T) {
 	start := time.Now()
 	// This command outputs "ready" then sleeps - but it completes quickly
 	// because shell sees echo finish before sleep starts in pipeline
-	result := Execute(&RunContext{}, "echo ready && sleep 10", []*nodes.Directive{directive}, source, false)
+
+	ctx, _ := NewRunContext()
+	defer ctx.Cleanup()
+	result := Execute(ctx, "echo ready && sleep 10 &", []*nodes.Directive{directive}, source, false)
 	elapsed := time.Since(start)
 
 	// Should complete much faster than 10s (directive matches immediately)
@@ -105,9 +115,11 @@ func TestExecuteServerWithCurlDirective(t *testing.T) {
 		Content: text.NewSegment(9, len(source)-4), // the curl command
 	}
 
+	ctx, _ := NewRunContext()
+	defer ctx.Cleanup()
 	start := time.Now()
-	result := Execute(&RunContext{},
-		"python3 -m http.server "+port+" --bind 127.0.0.1 2>&1",
+	result := Execute(ctx,
+		"python3 -m http.server "+port+" --bind 127.0.0.1 2>&1 &",
 		[]*nodes.Directive{directive},
 		source,
 		false,
@@ -196,7 +208,7 @@ func TestCheckDirectives(t *testing.T) {
 				Content: text.NewSegment(0, len(tt.content)),
 			}
 
-			result := CheckDirective(tt.output, directive, source, nil, nil)
+			result := CheckDirective(tt.output, directive, source, nil, &RunContext{})
 			if result.Passed != tt.wantPass {
 				t.Errorf("CheckDirective().Passed = %v, want %v", result.Passed, tt.wantPass)
 			}
@@ -205,7 +217,9 @@ func TestCheckDirectives(t *testing.T) {
 }
 
 func runShellCmd(cmd string) error {
-	return Execute(&RunContext{}, cmd, nil, nil, false).Err
+	ctx, _ := NewRunContext()
+	defer ctx.Cleanup()
+	return Execute(ctx, cmd, nil, nil, false).Err
 }
 
 func TestCheckDirectiveTypeExpansion(t *testing.T) {
@@ -219,7 +233,7 @@ func TestCheckDirectiveTypeExpansion(t *testing.T) {
 		t.Fatalf("Precompile failed: %v", err)
 	}
 
-	result := CheckDirective(output, directive, source, patterns, nil)
+	result := CheckDirective(output, directive, source, patterns, &RunContext{})
 	if !result.Passed {
 		t.Errorf("Expected output to contain 'Hello 2023-10-25', got failure")
 	}
@@ -234,9 +248,10 @@ func TestCheckDirectiveCmdWithEnv(t *testing.T) {
 
 	// Append environment variable definition to the environment file
 	envData := "export TEST_VAR=my_secret_val\n"
-	if err := os.WriteFile(ctx.MkEnvFile, []byte(envData), 0600); err != nil {
-		t.Fatalf("failed to write to environment file: %v", err)
-	}
+	envFile := filepath.Join(os.TempDir(), "test_env_file_cmd")
+	os.WriteFile(envFile, []byte(envData), 0600)
+	ctx.EnvFile = envFile
+	defer os.Remove(envFile)
 
 	source := []byte(`<!-- cmd [ "$TEST_VAR" = "my_secret_val" ] -->`)
 	directive, ok := nodes.ParseDirective(source, 0)

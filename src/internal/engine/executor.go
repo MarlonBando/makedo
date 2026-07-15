@@ -20,53 +20,124 @@ const (
 	bufSize        = 4096
 )
 
-// Execute runs a command with goroutine-based output monitoring.
-// Returns when: command exits, all directives pass.
 func Execute(ctx *RunContext, code string, directives []*nodes.Directive, source []byte, stream bool) *Result {
-	// before every shell execution we load the makedo env file
-	// in this way the user can share varibles
-	// across different shell block
-	code = fmt.Sprintf("source %q\n%s", ctx.MkEnvFile, code)
-
 	compiledPatterns, err := PrecompileDirectives(directives, source)
 	if err != nil {
 		return &Result{Err: err, ExitCode: -1}
 	}
 
-	var warnings []error
 	if hasBackgroundOperator(code) {
-		warnings = append(warnings, fmt.Errorf("detected & in block! makedo manages background processes automatically. Split long-running commands into their own block and use a directive to signal readiness"))
+		return executeBackground(ctx, code, directives, source, stream, compiledPatterns)
 	}
 
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", code)
+	return executeSync(ctx, code, directives, source, stream, compiledPatterns)
+}
 
-	// Set up process group so we can kill the entire tree
+func executeSync(ctx *RunContext, code string, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *Result {
+	uuidVal := time.Now().UnixNano()
+	cwdFile := fmt.Sprintf("/tmp/makedo_cwd_%d", uuidVal)
+	envFile := fmt.Sprintf("/tmp/makedo_env_%d", uuidVal)
+	markerPrefix := fmt.Sprintf("MAKEDO_DONE_%d", uuidVal)
+
+	// The empty echo "" is CRITICAL: If the user's command does not output a trailing newline 
+	// (e.g. `printf` or `curl -w`), it will concatenate with our marker on the same line, 
+	// preventing strings.HasPrefix from detecting the marker and causing a deadlock.
+	// 
+	// Capturing EXIT_CODE=$? immediately after the user code ensures we track the exit status
+	// of the exact last command the user wrote, mimicking standard bash behavior.
+	_, err := fmt.Fprintf(ctx.Stdin, "%s\nEXIT_CODE=$?\npwd > %s\nexport -p > %s\necho \"\"\necho \"%s: $EXIT_CODE\"\n", code, cwdFile, envFile, markerPrefix)
+	if err != nil {
+		return &Result{Err: err, ExitCode: -1}
+	}
+
+	var buf bytes.Buffer
+	for {
+		line, err := ctx.StdoutReader.ReadString('\n')
+		if err != nil {
+			// Persistent shell crashed or EOF
+			return &Result{Err: fmt.Errorf("persistent shell died: %w", err), ExitCode: -1}
+		}
+		
+		if stream {
+			_, _ = os.Stdout.WriteString(line)
+		}
+
+		if strings.HasPrefix(line, markerPrefix+":") {
+			exitCodeStr := strings.TrimSpace(strings.TrimPrefix(line, markerPrefix+":"))
+			exitCode := 0
+			fmt.Sscanf(exitCodeStr, "%d", &exitCode)
+			
+			// Update state
+			if cwdBytes, err := os.ReadFile(cwdFile); err == nil {
+				ctx.Cwd = strings.TrimSpace(string(cwdBytes))
+			}
+			os.Remove(cwdFile)
+			
+			// Clean up previous env file
+			if ctx.EnvFile != "" {
+				os.Remove(ctx.EnvFile)
+			}
+			ctx.EnvFile = envFile
+			
+			return &Result{
+				Status:   Completed,
+				Output:   buf.Bytes(),
+				ExitCode: exitCode,
+			}
+		}
+		
+		buf.WriteString(line)
+	}
+}
+
+func executeBackground(ctx *RunContext, code string, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp) *Result {
+	uuidVal := time.Now().UnixNano()
+	cwdFile := fmt.Sprintf("/tmp/makedo_cwd_%d", uuidVal)
+	envFile := fmt.Sprintf("/tmp/makedo_env_%d", uuidVal)
+	markerPrefix := fmt.Sprintf("MAKEDO_DONE_%d", uuidVal)
+
+	// Dump state from persistent shell.
+	// The empty echo "" prevents concatenation issues if the previous command omitted a newline.
+	fmt.Fprintf(ctx.Stdin, "pwd > %s\nexport -p > %s\necho \"\"\necho '%s: 0'\n", cwdFile, envFile, markerPrefix)
+	
+	for {
+		line, err := ctx.StdoutReader.ReadString('\n')
+		if err != nil {
+			return &Result{Err: fmt.Errorf("persistent shell died during state handoff: %w", err), ExitCode: -1}
+		}
+		if strings.HasPrefix(line, markerPrefix+":") {
+			break
+		}
+	}
+
+	// We append `\nwait` so that `bash` blocks waiting for the `&` background processes to finish.
+	// This keeps the output pipe open so `monitor()` can continuously poll the output and directives,
+	// rather than `bash` exiting instantly and returning EOF.
+	bgCode := fmt.Sprintf("cd \"$(cat %s)\"\nsource %s\nrm -f %s %s\n%s\nwait", cwdFile, envFile, cwdFile, envFile, code)
+	cmd := exec.Command(os.Getenv("SHELL"), "-c", bgCode)
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return &Result{Err: err, ExitCode: -1, Warnings: warnings}
+		return &Result{Err: err, ExitCode: -1}
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return &Result{Err: err, ExitCode: -1, Warnings: warnings}
+		return &Result{Err: err, ExitCode: -1}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return &Result{Err: err, ExitCode: -1, Warnings: warnings}
+		return &Result{Err: err, ExitCode: -1}
 	}
 
-	// Channel for output chunks, closed when both readers exit
 	output := make(chan []byte, 16)
 	done := make(chan struct{})
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	// TODO: stdout and stderr are multiplexed into the same output channel.
-	// This means 'out' and 'outr' directives check the combined stream.
-	// Revisit this if we want strict separation (e.g., implementing an 'err' directive for stderr only).
 	go pumpOutput(stdout, output, done, &wg)
 	go pumpOutput(stderr, output, done, &wg)
 	go func() {
@@ -75,9 +146,6 @@ func Execute(ctx *RunContext, code string, directives []*nodes.Directive, source
 	}()
 
 	result := monitor(cmd, output, done, directives, source, stream, compiledPatterns, ctx)
-	result.Warnings = append(result.Warnings, warnings...)
-
-	// If process still running, it stays alive for registry to kill later
 	return result
 }
 
@@ -106,12 +174,25 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 	defer ticker.Stop()
 
 	hasDirectives := len(directives) > 0
+	
+	// If it's a background block with no directives, we should not block waiting for EOF.
+	// We return immediately, just like bash does when you append `&`.
+	if !hasDirectives {
+		close(done)
+		return &Result{
+			Status:   Ready,
+			Output:   buf.Bytes(),
+			Process:  cmd.Process,
+			ExitCode: -1,
+		}
+	}
+
 	needsCmdCheck := hasCmdDirective(directives)
 	allowEarlyExit := canEarlyExit(directives)
 
 	// Immediate initial check of ALL directives (before any output)
 	// This handles cases where directives pass before command produces output
-	if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
+	if allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
 		close(done)
 		return &Result{
 			Status:   Ready,
@@ -174,6 +255,8 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 // pumpOutput reads from r and sends to ch until EOF or done signal.
 // When done is closed, continues reading (drain mode) but discards data.
+// Draining is essential because if we stop reading, a background shell 
+// process could eventually block entirely on a full stdout buffer and freeze.
 func pumpOutput(r io.Reader, ch chan<- []byte, done <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	buf := make([]byte, bufSize)
@@ -267,9 +350,11 @@ func stripComment(b string, strRanges []byteRange) string {
 // hasBackgroundOp scans b for a lone & (not part of &&) that is outside
 // any quoted string and is either followed by a space/tab or sits at
 // the end of the slice — the unambiguous shell background operator.
-// strRanges must have been computed on the original line before comment
-// stripping; they remain valid because stripComment only shortens from
-// the right, never before any string range.
+// 
+// TODO: This uses basic string manipulation and will yield false positives
+// in edge cases like stderr redirects (`>& 2`), subshells (`$(cmd &)`), 
+// and heredocs. It is worth considering replacing this with a full bash AST 
+// parser (like mvdan.cc/sh) in the future for perfect accuracy.
 func hasBackgroundOp(b string, strRanges []byteRange) bool {
 	for i := 0; i < len(b); i++ {
 		if b[i] != '&' {
