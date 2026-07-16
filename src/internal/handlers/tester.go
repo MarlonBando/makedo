@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
 
 	"makedo/internal/engine"
 	"makedo/internal/nodes"
@@ -20,8 +19,6 @@ func lineNumber(source []byte, offset int) int {
 }
 
 func VerifyMarkdown(mdPath string, ctx *engine.RunContext) error {
-	mdPath = strings.TrimSpace(mdPath)
-
 	source, err := os.ReadFile(mdPath)
 	if err != nil {
 		return err

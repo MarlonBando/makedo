@@ -6,7 +6,7 @@ import (
 )
 
 func TestRunMarkdownFileMissingFile(t *testing.T) {
-	ctx, err := engine.NewRunContext()
+	ctx, err := engine.NewRunContext("")
 	if err != nil {
 		t.Fatalf("failed to create run context: %v", err)
 	}

@@ -26,7 +26,7 @@ func TestVerifyMarkdownRunsSetupBlockWithoutCountingTest(t *testing.T) {
 
 	var verifyErr error
 	output := captureStdout(t, func() {
-		ctx, err := engine.NewRunContext()
+		ctx, err := engine.NewRunContext("")
 		if err != nil {
 			t.Fatalf("failed to create run context: %v", err)
 		}
@@ -63,7 +63,7 @@ func TestVerifyMarkdownFailsOnSetupBlockNonZeroExit(t *testing.T) {
 
 	var verifyErr error
 	_ = captureStdout(t, func() {
-		ctx, err := engine.NewRunContext()
+		ctx, err := engine.NewRunContext("")
 		if err != nil {
 			t.Fatalf("failed to create run context: %v", err)
 		}
@@ -92,7 +92,7 @@ func TestVerifyMarkdownHandlesPrecompileErrorGracefully(t *testing.T) {
 
 	var verifyErr error
 	output := captureStdout(t, func() {
-		ctx, err := engine.NewRunContext()
+		ctx, err := engine.NewRunContext("")
 		if err != nil {
 			t.Fatalf("failed to create run context: %v", err)
 		}

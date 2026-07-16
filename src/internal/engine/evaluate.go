@@ -48,7 +48,7 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 
 	if execResult.Err != nil {
 		outcome.Passed = false
-		outcome.FailReason = execResult.Err
+		outcome.FailReason = fmt.Errorf("block at line %d crashed: %w", lineNum, execResult.Err)
 		return outcome
 	}
 

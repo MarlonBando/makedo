@@ -14,7 +14,7 @@ import (
 )
 
 func TestExecuteFastCommand(t *testing.T) {
-	ctx, _ := NewRunContext()
+	ctx, _ := NewRunContext("")
 	defer ctx.Cleanup()
 	result := Execute(ctx, "echo hello", nil, nil, false)
 
@@ -30,7 +30,7 @@ func TestExecuteFastCommand(t *testing.T) {
 }
 
 func TestExecuteCommandWithNonZeroExit(t *testing.T) {
-	ctx, _ := NewRunContext()
+	ctx, _ := NewRunContext("")
 	defer ctx.Cleanup()
 	result := Execute(ctx, "sh -c 'exit 42'", nil, nil, false)
 
@@ -49,7 +49,7 @@ func TestExecuteWithOutDirective(t *testing.T) {
 		Content: text.NewSegment(9, 14), // "hello"
 	}
 
-	ctx, _ := NewRunContext()
+	ctx, _ := NewRunContext("")
 	defer ctx.Cleanup()
 	result := Execute(ctx, "echo hello world", []*nodes.Directive{directive}, source, false)
 
@@ -79,7 +79,7 @@ func TestExecuteLongRunningWithDirective(t *testing.T) {
 	// This command outputs "ready" then sleeps - but it completes quickly
 	// because shell sees echo finish before sleep starts in pipeline
 
-	ctx, _ := NewRunContext()
+	ctx, _ := NewRunContext("")
 	defer ctx.Cleanup()
 	result := Execute(ctx, "echo ready && sleep 10 &", []*nodes.Directive{directive}, source, false)
 	elapsed := time.Since(start)
@@ -115,7 +115,7 @@ func TestExecuteServerWithCurlDirective(t *testing.T) {
 		Content: text.NewSegment(9, len(source)-4), // the curl command
 	}
 
-	ctx, _ := NewRunContext()
+	ctx, _ := NewRunContext("")
 	defer ctx.Cleanup()
 	start := time.Now()
 	result := Execute(ctx,
@@ -217,7 +217,7 @@ func TestCheckDirectives(t *testing.T) {
 }
 
 func runShellCmd(cmd string) error {
-	ctx, _ := NewRunContext()
+	ctx, _ := NewRunContext("")
 	defer ctx.Cleanup()
 	return Execute(ctx, cmd, nil, nil, false).Err
 }
@@ -240,7 +240,7 @@ func TestCheckDirectiveTypeExpansion(t *testing.T) {
 }
 
 func TestCheckDirectiveCmdWithEnv(t *testing.T) {
-	ctx, err := NewRunContext()
+	ctx, err := NewRunContext("")
 	if err != nil {
 		t.Fatalf("failed to create run context: %v", err)
 	}

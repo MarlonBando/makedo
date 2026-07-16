@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
 type RunContext struct {
@@ -18,7 +19,7 @@ type RunContext struct {
 	waitDone     chan struct{}
 }
 
-func NewRunContext() (*RunContext, error) {
+func NewRunContext(mdPath string) (*RunContext, error) {
 	cmd := exec.Command("bash")
 
 	// Create a single pipe for both stdout and stderr
@@ -46,7 +47,16 @@ func NewRunContext() (*RunContext, error) {
 		close(waitDone)
 	}()
 
-	cwd, _ := os.Getwd()
+	var cwd string
+	if filepath.IsAbs(mdPath) {
+		cwd = filepath.Dir(mdPath)
+	} else {
+		workingDir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		cwd = filepath.Join(workingDir, filepath.Dir(mdPath))
+	}
 
 	return &RunContext{
 		Registry:     NewRegistry(),

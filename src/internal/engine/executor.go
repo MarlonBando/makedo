@@ -37,15 +37,23 @@ func executeSync(ctx *RunContext, code string, directives []*nodes.Directive, so
 	uuidVal := time.Now().UnixNano()
 	cwdFile := fmt.Sprintf("/tmp/makedo_cwd_%d", uuidVal)
 	envFile := fmt.Sprintf("/tmp/makedo_env_%d", uuidVal)
-	markerPrefix := fmt.Sprintf("MAKEDO_DONE_%d", uuidVal)
+	markerPrefix := fmt.Sprintf("MAKEDO_DONE_%d:", uuidVal)
 
-	// The empty echo "" is CRITICAL: If the user's command does not output a trailing newline 
-	// (e.g. `printf` or `curl -w`), it will concatenate with our marker on the same line, 
+	// The empty echo "" is CRITICAL: If the user's command does not output a trailing newline
+	// (e.g. `printf` or `curl -w`), it will concatenate with our marker on the same line,
 	// preventing strings.HasPrefix from detecting the marker and causing a deadlock.
-	// 
+	//
 	// Capturing EXIT_CODE=$? immediately after the user code ensures we track the exit status
 	// of the exact last command the user wrote, mimicking standard bash behavior.
-	_, err := fmt.Fprintf(ctx.Stdin, "%s\nEXIT_CODE=$?\npwd > %s\nexport -p > %s\necho \"\"\necho \"%s: $EXIT_CODE\"\n", code, cwdFile, envFile, markerPrefix)
+	script := fmt.Sprintf(`%s
+EXIT_CODE=$?
+pwd > %s
+export -p > %s
+echo ""
+echo "%s $EXIT_CODE"
+`, code, cwdFile, envFile, markerPrefix)
+
+	_, err := fmt.Fprint(ctx.Stdin, script)
 	if err != nil {
 		return &Result{Err: err, ExitCode: -1}
 	}
@@ -54,38 +62,39 @@ func executeSync(ctx *RunContext, code string, directives []*nodes.Directive, so
 	for {
 		line, err := ctx.StdoutReader.ReadString('\n')
 		if err != nil {
-			// Persistent shell crashed or EOF
-			return &Result{Err: fmt.Errorf("persistent shell died: %w", err), ExitCode: -1}
-		}
-		
-		if stream {
-			_, _ = os.Stdout.WriteString(line)
+			return &Result{Err: fmt.Errorf("shell environment crashed: %w", err), ExitCode: -1}
 		}
 
-		if strings.HasPrefix(line, markerPrefix+":") {
-			exitCodeStr := strings.TrimSpace(strings.TrimPrefix(line, markerPrefix+":"))
+		if strings.HasPrefix(line, markerPrefix) {
+			exitCodeStr := strings.TrimSpace(strings.TrimPrefix(line, markerPrefix))
 			exitCode := 0
 			fmt.Sscanf(exitCodeStr, "%d", &exitCode)
-			
+
 			// Update state
 			if cwdBytes, err := os.ReadFile(cwdFile); err == nil {
 				ctx.Cwd = strings.TrimSpace(string(cwdBytes))
 			}
 			os.Remove(cwdFile)
-			
+
 			// Clean up previous env file
 			if ctx.EnvFile != "" {
 				os.Remove(ctx.EnvFile)
 			}
 			ctx.EnvFile = envFile
-			
+
 			return &Result{
 				Status:   Completed,
 				Output:   buf.Bytes(),
 				ExitCode: exitCode,
 			}
 		}
-		
+
+		// We forward the output of the block to the shell
+		// in which makedo is running (if it's not the internal marker)
+		if stream {
+			_, _ = os.Stdout.WriteString(line)
+		}
+
 		buf.WriteString(line)
 	}
 }
@@ -94,18 +103,23 @@ func executeBackground(ctx *RunContext, code string, directives []*nodes.Directi
 	uuidVal := time.Now().UnixNano()
 	cwdFile := fmt.Sprintf("/tmp/makedo_cwd_%d", uuidVal)
 	envFile := fmt.Sprintf("/tmp/makedo_env_%d", uuidVal)
-	markerPrefix := fmt.Sprintf("MAKEDO_DONE_%d", uuidVal)
+	markerPrefix := fmt.Sprintf("MAKEDO_DONE_%d:", uuidVal)
 
 	// Dump state from persistent shell.
 	// The empty echo "" prevents concatenation issues if the previous command omitted a newline.
-	fmt.Fprintf(ctx.Stdin, "pwd > %s\nexport -p > %s\necho \"\"\necho '%s: 0'\n", cwdFile, envFile, markerPrefix)
-	
+	script := fmt.Sprintf(`pwd > %s
+export -p > %s
+echo ""
+echo '%s 0'
+`, cwdFile, envFile, markerPrefix)
+	_, err := fmt.Fprint(ctx.Stdin, script)
+
 	for {
 		line, err := ctx.StdoutReader.ReadString('\n')
 		if err != nil {
-			return &Result{Err: fmt.Errorf("persistent shell died during state handoff: %w", err), ExitCode: -1}
+			return &Result{Err: fmt.Errorf("shell environment crashed during state handoff: %w", err), ExitCode: -1}
 		}
-		if strings.HasPrefix(line, markerPrefix+":") {
+		if strings.HasPrefix(line, markerPrefix) {
 			break
 		}
 	}
@@ -113,7 +127,11 @@ func executeBackground(ctx *RunContext, code string, directives []*nodes.Directi
 	// We append `\nwait` so that `bash` blocks waiting for the `&` background processes to finish.
 	// This keeps the output pipe open so `monitor()` can continuously poll the output and directives,
 	// rather than `bash` exiting instantly and returning EOF.
-	bgCode := fmt.Sprintf("cd \"$(cat %s)\"\nsource %s\nrm -f %s %s\n%s\nwait", cwdFile, envFile, cwdFile, envFile, code)
+	bgCode := fmt.Sprintf(`cd "$(cat %s)"
+source %s
+rm -f %s %s
+%s
+wait`, cwdFile, envFile, cwdFile, envFile, code)
 	cmd := exec.Command(os.Getenv("SHELL"), "-c", bgCode)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -174,7 +192,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 	defer ticker.Stop()
 
 	hasDirectives := len(directives) > 0
-	
+
 	// If it's a background block with no directives, we should not block waiting for EOF.
 	// We return immediately, just like bash does when you append `&`.
 	if !hasDirectives {
@@ -255,7 +273,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 // pumpOutput reads from r and sends to ch until EOF or done signal.
 // When done is closed, continues reading (drain mode) but discards data.
-// Draining is essential because if we stop reading, a background shell 
+// Draining is essential because if we stop reading, a background shell
 // process could eventually block entirely on a full stdout buffer and freeze.
 func pumpOutput(r io.Reader, ch chan<- []byte, done <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -350,19 +368,41 @@ func stripComment(b string, strRanges []byteRange) string {
 // hasBackgroundOp scans b for a lone & (not part of &&) that is outside
 // any quoted string and is either followed by a space/tab or sits at
 // the end of the slice — the unambiguous shell background operator.
-// 
+//
 // TODO: This uses basic string manipulation and will yield false positives
-// in edge cases like stderr redirects (`>& 2`), subshells (`$(cmd &)`), 
-// and heredocs. It is worth considering replacing this with a full bash AST 
+// in edge cases like stderr redirects (`>& 2`), subshells (`$(cmd &)`),
+// and heredocs. It is worth considering replacing this with a full bash AST
 // parser (like mvdan.cc/sh) in the future for perfect accuracy.
 func hasBackgroundOp(b string, strRanges []byteRange) bool {
+	parens := 0
 	for i := 0; i < len(b); i++ {
-		if b[i] != '&' {
-			continue
-		}
 		if inAnyRange(i, strRanges) {
 			continue
 		}
+
+		if b[i] == '(' {
+			parens++
+			continue
+		}
+		if b[i] == ')' {
+			parens--
+			continue
+		}
+
+		if b[i] != '&' {
+			continue
+		}
+
+		// Skip if we are inside a subshell like $(cmd &)
+		if parens > 0 {
+			continue
+		}
+
+		// Skip >& (stderr redirection)
+		if i > 0 && b[i-1] == '>' {
+			continue
+		}
+
 		// && → logical AND, skip both characters.
 		if i+1 < len(b) && b[i+1] == '&' {
 			i++
