@@ -6,11 +6,11 @@ bookToc: true
 
 # Background Processes
 
-MakeDo automatically manages background processes. When a code block with directives passes its checks before the command exits, MakeDo keeps the command running in the background for subsequent blocks to use.
+MakeDo supports running background processes. By using the shell `&` operator, you can start a long-running service. MakeDo will run the command in a detached background shell, monitor its output, and wait for its directives to pass before proceeding to the next block.
 
 ## How It Works
 
-1. **Start**: The shell command is started as a new process group
+1. **Start**: The shell command is started as a new process group in the background
 2. **Continuous Evaluation**: As output arrives, MakeDo evaluates directives continuously
 3. **Ready State**: If all directives pass before the command exits, MakeDo moves on to the next block while leaving the command running
 4. **Automatic Cleanup**: At the end of the document, MakeDo kills all background processes
@@ -20,7 +20,7 @@ MakeDo automatically manages background processes. When a code block with direct
 You can start a long-running server and immediately use it in the next block:
 
 ```bash
-python3 -m http.server 8877 2>&1
+python3 -m http.server 8877 2>&1 &
 ```
 <!-- cmd curl -s http://localhost:8877 > /dev/null 2>&1 -->
 
@@ -37,6 +37,6 @@ At the end of this page, MakeDo automatically kills the server.
 
 If a command produces no output for 10 seconds (the default `StallTimeout`), it is marked as **Stalled**. If the block had directives that haven't passed yet, this results in a test failure.
 
-## Background Operator Warning
+## The Background Operator
 
-MakeDo manages background processes automatically based on directive satisfaction. Using the shell `&` operator manually is **discouraged**. If MakeDo detects a lone `&` operator, it will issue a warning.
+You MUST use the standard shell background operator (`&`) to tell MakeDo that a command should run in the background. Without it, MakeDo will wait synchronously for the command to finish, which will cause your test to stall if it's a long-running server. MakeDo automatically manages the lifecycle of these background processes and ensures they are safely terminated at the end of the test.
