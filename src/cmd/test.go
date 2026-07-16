@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"github.com/spf13/cobra"
 	"makedo/internal/engine"
 	"makedo/internal/handlers"
-
-	"github.com/spf13/cobra"
+	"strings"
 )
 
 var testCmd = &cobra.Command{
@@ -13,13 +13,14 @@ var testCmd = &cobra.Command{
 	Long:  `Run code blocks followed by html comment in the format of '<!-- directive <content> -->'  verify their output matches the expected pattern.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, err := engine.NewRunContext()
+		mdPath := strings.TrimSpace(args[0])
+		ctx, err := engine.NewRunContext(mdPath)
 		if err != nil {
 			return err
 		}
 
 		defer ctx.Cleanup()
-		return handlers.VerifyMarkdown(args[0], ctx)
+		return handlers.VerifyMarkdown(mdPath, ctx)
 	},
 }
 

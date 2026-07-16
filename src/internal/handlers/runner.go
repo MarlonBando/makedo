@@ -39,8 +39,6 @@ type renderContext struct {
 }
 
 func RunMarkdownFile(mdFile string, runCtx *engine.RunContext) error {
-	mdFile = strings.TrimSpace(mdFile)
-
 	source, err := os.ReadFile(mdFile)
 	if err != nil {
 		return err
@@ -144,11 +142,14 @@ func (ctx *renderContext) handleCodeBlock(node ast.Node, code []byte, directives
 		ctx.runCtx.Registry.Add(result.Process)
 	}
 
+	// Calculate line number for error reporting
+	lineNum := bytes.Count(ctx.source[:start], []byte{'\n'}) + 1
+
 	// Print error/status message
 	if result.Err != nil {
-		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] %v", result.Err)))
+		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] block at line %d crashed: %v", lineNum, result.Err)))
 	} else if result.ExitCode > 0 {
-		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] exit code %d", result.ExitCode)))
+		fmt.Println(errorStyle.Render(fmt.Sprintf("[ERROR] block at line %d exited with code %d", lineNum, result.ExitCode)))
 	}
 
 	ctx.lastPos = end

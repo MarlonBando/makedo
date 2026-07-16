@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -41,9 +42,9 @@ func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPa
 	case nodes.DirectiveCmd:
 		res = checkCmd(content, ctx)
 	case nodes.DirectivePwd:
-		res = checkPwd(content)
+		res = checkPwd(content, ctx)
 	case nodes.DirectiveCheckpath:
-		res = checkPath(content)
+		res = checkPath(content, ctx)
 	default:
 		res = &DirectiveResult{Passed: true}
 	}
@@ -108,8 +109,16 @@ func checkOutRegex(output []byte, pattern string) *DirectiveResult {
 }
 
 func checkCmd(command string, ctx *RunContext) *DirectiveResult {
-	cmdStr := fmt.Sprintf("source %q\n%s", ctx.MkEnvFile, command)
-	err := exec.Command(os.Getenv("SHELL"), "-c", cmdStr).Run()
+	cmdStr := command
+	if ctx.EnvFile != "" {
+		cmdStr = fmt.Sprintf("source %q\n%s", ctx.EnvFile, command)
+	}
+	shell, flag := getShell()
+	cmd := exec.Command(shell, flag, cmdStr)
+	if ctx.Cwd != "" {
+		cmd.Dir = ctx.Cwd
+	}
+	err := cmd.Run()
 	return &DirectiveResult{
 		Passed:   err == nil,
 		Expected: "exit 0",
@@ -118,14 +127,18 @@ func checkCmd(command string, ctx *RunContext) *DirectiveResult {
 	}
 }
 
-func checkPwd(pattern string) *DirectiveResult {
+func checkPwd(pattern string, ctx *RunContext) *DirectiveResult {
 	pattern = strings.TrimSpace(pattern)
-	cwd, err := os.Getwd()
-	if err != nil {
-		return &DirectiveResult{
-			Passed:   false,
-			Expected: pattern,
-			Err:      fmt.Errorf("failed to get working directory: %w", err),
+	cwd := ctx.Cwd
+	if cwd == "" {
+		var err error
+		cwd, err = os.Getwd()
+		if err != nil {
+			return &DirectiveResult{
+				Passed:   false,
+				Expected: pattern,
+				Err:      fmt.Errorf("failed to get working directory: %w", err),
+			}
 		}
 	}
 
@@ -147,11 +160,15 @@ func checkPwd(pattern string) *DirectiveResult {
 	}
 }
 
-func checkPath(path string) *DirectiveResult {
+func checkPath(path string, ctx *RunContext) *DirectiveResult {
 	path = strings.TrimSpace(path)
 	// TODO: expand environment variables
 
-	_, err := os.Stat(path)
+	checkP := path
+	if !filepath.IsAbs(checkP) && ctx.Cwd != "" {
+		checkP = filepath.Join(ctx.Cwd, checkP)
+	}
+	_, err := os.Stat(checkP)
 	return &DirectiveResult{
 		Passed:   err == nil,
 		Expected: path,

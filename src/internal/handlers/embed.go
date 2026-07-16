@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
 
 	"makedo/internal/engine"
 	"makedo/internal/nodes"
@@ -15,8 +14,6 @@ import (
 )
 
 func EmbedMarkdownFile(mdFile string, ctx *engine.RunContext) error {
-	mdFile = strings.TrimSpace(mdFile)
-
 	source, err := os.ReadFile(mdFile)
 	if err != nil {
 		return err

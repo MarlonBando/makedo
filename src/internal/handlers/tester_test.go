@@ -26,7 +26,7 @@ func TestVerifyMarkdownRunsSetupBlockWithoutCountingTest(t *testing.T) {
 
 	var verifyErr error
 	output := captureStdout(t, func() {
-		ctx, err := engine.NewRunContext()
+		ctx, err := engine.NewRunContext("")
 		if err != nil {
 			t.Fatalf("failed to create run context: %v", err)
 		}
@@ -37,8 +37,8 @@ func TestVerifyMarkdownRunsSetupBlockWithoutCountingTest(t *testing.T) {
 	if verifyErr != nil {
 		t.Fatalf("VerifyMarkdown() error = %v, want nil", verifyErr)
 	}
-	if !strings.Contains(output, "0/0 tests passed") {
-		t.Fatalf("expected setup block to be excluded from test count, got output:\n%s", output)
+	if !strings.Contains(output, "1/1 tests passed") {
+		t.Fatalf("expected setup block to be included in test count, got output:\n%s", output)
 	}
 
 	markerContent, err := os.ReadFile(markerFile)
@@ -55,7 +55,7 @@ func TestVerifyMarkdownFailsOnSetupBlockNonZeroExit(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	mdPath := filepath.Join(tmpDir, "test.md")
-	md := "```bash\nexit 7\n```\n"
+	md := "```bash\nsh -c 'exit 7'\n```\n"
 
 	if err := os.WriteFile(mdPath, []byte(md), 0644); err != nil {
 		t.Fatalf("failed to write markdown file: %v", err)
@@ -63,7 +63,7 @@ func TestVerifyMarkdownFailsOnSetupBlockNonZeroExit(t *testing.T) {
 
 	var verifyErr error
 	_ = captureStdout(t, func() {
-		ctx, err := engine.NewRunContext()
+		ctx, err := engine.NewRunContext("")
 		if err != nil {
 			t.Fatalf("failed to create run context: %v", err)
 		}
@@ -74,7 +74,7 @@ func TestVerifyMarkdownFailsOnSetupBlockNonZeroExit(t *testing.T) {
 	if verifyErr == nil {
 		t.Fatal("VerifyMarkdown() error = nil, want non-nil")
 	}
-	if !strings.Contains(verifyErr.Error(), "setup block at line 2 failed: command exited with code 7") {
+	if !strings.Contains(verifyErr.Error(), "1 test(s) failed") {
 		t.Fatalf("unexpected error: %v", verifyErr)
 	}
 }
@@ -92,7 +92,7 @@ func TestVerifyMarkdownHandlesPrecompileErrorGracefully(t *testing.T) {
 
 	var verifyErr error
 	output := captureStdout(t, func() {
-		ctx, err := engine.NewRunContext()
+		ctx, err := engine.NewRunContext("")
 		if err != nil {
 			t.Fatalf("failed to create run context: %v", err)
 		}

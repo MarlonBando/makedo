@@ -14,7 +14,7 @@ We create a markdown file containing three blocks:
 ````bash
 cat << 'EOF' > /tmp/test_directiveless.md
 ```bash
-exit 1
+false
 ```
 
 ```bash
@@ -29,7 +29,7 @@ EOF
 
 # Run makedo test. It will return non-zero exit code because of the failure.
 # We capture the output and ensure it doesn't abort early.
-makedo test /tmp/test_directiveless.md > /tmp/test_directiveless.out 2>&1 || true
+bin/makedo test /tmp/test_directiveless.md > /tmp/test_directiveless.out 2>&1 || true
 ````
 <!-- cmd grep -q '2/3 tests passed — 1 block(s) failed' /tmp/test_directiveless.out -->
 
