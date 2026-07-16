@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -132,7 +133,8 @@ source %s
 rm -f %s %s
 %s
 wait`, cwdFile, envFile, cwdFile, envFile, code)
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", bgCode)
+	shell, flag := getShellConfig()
+	cmd := exec.Command(shell, flag, bgCode)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
@@ -448,4 +450,21 @@ func hasBackgroundOperator(code string) bool {
 	}
 
 	return false
+}
+
+func getShellConfig() (shell string, flag string) {
+	if sh := os.Getenv("SHELL"); sh != "" {
+		return sh, "-c"
+	}
+
+	// TODO: Support Windows environments in the future
+	if runtime.GOOS == "windows" {
+		if comspec := os.Getenv("COMSPEC"); comspec != "" {
+			return comspec, "/c"
+		}
+		return "cmd.exe", "/c"
+	}
+
+	// Fallback for Unix/macOS/Linux systems if $SHELL is unset
+	return "/bin/sh", "-c"
 }

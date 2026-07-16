@@ -20,7 +20,8 @@ type RunContext struct {
 }
 
 func NewRunContext(mdPath string) (*RunContext, error) {
-	cmd := exec.Command("bash")
+	shell, _ := getShellConfig()
+	cmd := exec.Command(shell)
 
 	// Create a single pipe for both stdout and stderr
 	pr, pw, err := os.Pipe()

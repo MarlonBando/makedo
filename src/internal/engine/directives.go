@@ -116,7 +116,8 @@ func checkCmd(command string, ctx *RunContext) *DirectiveResult {
 	if ctx.EnvFile != "" {
 		cmdStr = fmt.Sprintf("source %q\n%s", ctx.EnvFile, command)
 	}
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", cmdStr)
+	shell, flag := getShellConfig()
+	cmd := exec.Command(shell, flag, cmdStr)
 	if ctx.Cwd != "" {
 		cmd.Dir = ctx.Cwd
 	}
