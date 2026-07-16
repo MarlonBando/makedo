@@ -23,9 +23,6 @@ type DirectiveResult struct {
 // Future implementation of an `err` directive will require splitting this signature
 // to accept separate streams, or using a structured chunking mechanism.
 func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *DirectiveResult {
-	if ctx == nil {
-		panic("RunContext cannot be nil")
-	}
 	content := d.ContentString(source)
 
 	var res *DirectiveResult
