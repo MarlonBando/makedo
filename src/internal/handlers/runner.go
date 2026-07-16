@@ -39,8 +39,6 @@ type renderContext struct {
 }
 
 func RunMarkdownFile(mdFile string, runCtx *engine.RunContext) error {
-	mdFile = strings.TrimSpace(mdFile)
-
 	source, err := os.ReadFile(mdFile)
 	if err != nil {
 		return err

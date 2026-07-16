@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	"makedo/internal/engine"
 	"makedo/internal/handlers"
@@ -11,12 +13,13 @@ var runCmd = &cobra.Command{
 	Short: "Run fenced code blocks from a markdown file",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, err := engine.NewRunContext(args[0])
+		mdPath := strings.TrimSpace(args[0])
+		ctx, err := engine.NewRunContext(mdPath)
 		if err != nil {
 			return err
 		}
 		defer ctx.Cleanup()
-		return handlers.RunMarkdownFile(args[0], ctx)
+		return handlers.RunMarkdownFile(mdPath, ctx)
 	},
 }
 
