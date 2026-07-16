@@ -133,7 +133,7 @@ source %s
 rm -f %s %s
 %s
 wait`, cwdFile, envFile, cwdFile, envFile, code)
-	shell, flag := getShellConfig()
+	shell, flag := getShell()
 	cmd := exec.Command(shell, flag, bgCode)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -452,7 +452,7 @@ func hasBackgroundOperator(code string) bool {
 	return false
 }
 
-func getShellConfig() (shell string, flag string) {
+func getShell() (shell string, flag string) {
 	if sh := os.Getenv("SHELL"); sh != "" {
 		return sh, "-c"
 	}

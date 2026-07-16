@@ -20,7 +20,7 @@ type RunContext struct {
 }
 
 func NewRunContext(mdPath string) (*RunContext, error) {
-	shell, _ := getShellConfig()
+	shell, _ := getShell()
 	cmd := exec.Command(shell)
 
 	// Create a single pipe for both stdout and stderr
