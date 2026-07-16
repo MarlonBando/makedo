@@ -24,6 +24,9 @@ func NewRunContext(mdPath string) (*RunContext, error) {
 	cmd := exec.Command(shell)
 
 	// Create a single pipe for both stdout and stderr
+	// Stdout ---\
+	//            +---> pw ===[ PIPE ]===> pr ---> makedo
+	// Stderr ---/
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		return nil, err
