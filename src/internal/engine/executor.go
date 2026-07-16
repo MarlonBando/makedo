@@ -458,12 +458,6 @@ func getShell() (shell string, flag string) {
 	}
 
 	// TODO: Support Windows environments in the future
-	if runtime.GOOS == "windows" {
-		if comspec := os.Getenv("COMSPEC"); comspec != "" {
-			return comspec, "/c"
-		}
-		return "cmd.exe", "/c"
-	}
 
 	// Fallback for Unix/macOS/Linux systems if $SHELL is unset
 	return "/bin/sh", "-c"
