@@ -10,7 +10,7 @@ Ensure port 8866 is free and no residual sleeps exist:
 ! lsof -i :8866 -t 2>/dev/null
 pkill -f "sleep 9999" || true
 ```
-<!-- out  -->
+
 
 ## Setup and Run 
 
@@ -49,7 +49,7 @@ echo "Processes still alive!"
 exit 1
 )
 ```
-<!-- out  -->
+
 
 ## Cleanup
 
