@@ -16,7 +16,7 @@ pkill -f "sleep 9999" || true
 
 We'll run a test that spawns both a long-lived server and a background sleep task (which acts as an infinite short/long script).
 
-```bash
+````bash
 cat << 'INNER_EOF' > test-orphan.md
 ```bash
 python3 -m http.server 8866 2>&1 &
@@ -29,7 +29,7 @@ sleep 9999 &
 INNER_EOF
 
 bin/makedo test test-orphan.md
-```
+````
 <!-- out 2/2 tests passed -->
 
 ## Verify No Orphan Processes
@@ -38,6 +38,7 @@ After `makedo` finishes, the inner registry should have SIGKILLed both the serve
 
 ```bash
 # Give the OS time to reap the SIGKILLed processes (retry loop)
+(
 for i in {1..10}; do
   if ! pgrep -f "[s]leep 9999" > /dev/null && ! lsof -i :8866 -t 2>/dev/null > /dev/null; then
     exit 0
@@ -46,6 +47,7 @@ for i in {1..10}; do
 done
 echo "Processes still alive!"
 exit 1
+)
 ```
 <!-- out  -->
 
