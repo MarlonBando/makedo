@@ -58,17 +58,16 @@ jobs:
         hugo-version: 'latest'
         extended: true
 
+    - name: Setup Pages
+      id: pages
+      uses: actions/configure-pages@v5
+
     - name: Build with Hugo
       env:
         HUGO_ENVIRONMENT: production
       run: |
         cd docs
-        hugo --gc --minify
-
-    - name: Setup Pages
-      id: pages
-      if: github.ref == 'refs/heads/main'
-      uses: actions/configure-pages@v5
+        hugo --gc --minify --baseURL "${{ steps.pages.outputs.base_url }}/"
 
     - name: Upload artifact
       if: github.ref == 'refs/heads/main'

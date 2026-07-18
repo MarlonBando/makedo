@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"makedo/internal/nodes"
@@ -22,11 +23,13 @@ type DirectiveResult struct {
 // TODO: The `output` parameter currently represents the combined stdout+stderr stream.
 // Future implementation of an `err` directive will require splitting this signature
 // to accept separate streams, or using a structured chunking mechanism.
-func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *DirectiveResult {
+func CheckDirective(output []byte, exitCode *int, d *nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *DirectiveResult {
 	content := d.ContentString(source)
 
 	var res *DirectiveResult
 	switch d.Kind {
+	case nodes.DirectiveExit:
+		res = checkExit(exitCode, content)
 	case nodes.DirectiveOut:
 		if re, ok := compiledPatterns[d]; ok {
 			res = checkOutPrecompiled(output, re, content)
@@ -69,6 +72,33 @@ func CheckDirective(output []byte, d *nodes.Directive, source []byte, compiledPa
 	}
 
 	return res
+}
+
+func checkExit(exitCode *int, content string) *DirectiveResult {
+	expectedExit, err := strconv.Atoi(strings.TrimSpace(content))
+	if err != nil {
+		return &DirectiveResult{
+			Passed:   false,
+			Expected: "integer exit code",
+			Actual:   content,
+			Err:      fmt.Errorf("invalid exit directive: must be an integer"),
+		}
+	}
+
+	if exitCode == nil {
+		// Process is still running, so it hasn't exited yet.
+		return &DirectiveResult{
+			Passed:   false,
+			Expected: fmt.Sprintf("exit code %d", expectedExit),
+			Actual:   "process still running",
+		}
+	}
+
+	return &DirectiveResult{
+		Passed:   *exitCode == expectedExit,
+		Expected: fmt.Sprintf("exit code %d", expectedExit),
+		Actual:   fmt.Sprintf("exit code %d", *exitCode),
+	}
 }
 
 func checkOutPrecompiled(output []byte, re *regexp.Regexp, expected string) *DirectiveResult {
@@ -210,7 +240,7 @@ func checkFastDirectives(output []byte, directives []*nodes.Directive, source []
 	for _, d := range directives {
 		switch d.Kind {
 		case nodes.DirectiveOut, nodes.DirectiveOutRegex, nodes.DirectivePwd, nodes.DirectiveCheckpath:
-			if !CheckDirective(output, d, source, compiledPatterns, ctx).Passed {
+			if !CheckDirective(output, nil, d, source, compiledPatterns, ctx).Passed {
 				return false
 			}
 		}
@@ -222,7 +252,7 @@ func checkFastDirectives(output []byte, directives []*nodes.Directive, source []
 // Called on ticker to avoid spawning processes too frequently.
 func checkAllDirectives(output []byte, directives []*nodes.Directive, source []byte, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) bool {
 	for _, d := range directives {
-		if !CheckDirective(output, d, source, compiledPatterns, ctx).Passed {
+		if !CheckDirective(output, nil, d, source, compiledPatterns, ctx).Passed {
 			return false
 		}
 	}

@@ -209,7 +209,7 @@ func TestCheckDirectives(t *testing.T) {
 				Content: text.NewSegment(0, len(tt.content)),
 			}
 
-			result := CheckDirective(tt.output, directive, source, nil, &RunContext{})
+			result := CheckDirective(tt.output, nil, directive, source, nil, &RunContext{})
 			if result.Passed != tt.wantPass {
 				t.Errorf("CheckDirective().Passed = %v, want %v", result.Passed, tt.wantPass)
 			}
@@ -234,7 +234,7 @@ func TestCheckDirectiveTypeExpansion(t *testing.T) {
 		t.Fatalf("Precompile failed: %v", err)
 	}
 
-	result := CheckDirective(output, directive, source, patterns, &RunContext{})
+	result := CheckDirective(output, nil, directive, source, patterns, &RunContext{})
 	if !result.Passed {
 		t.Errorf("Expected output to contain 'Hello 2023-10-25', got failure")
 	}
@@ -260,7 +260,7 @@ func TestCheckDirectiveCmdWithEnv(t *testing.T) {
 		t.Fatalf("failed to parse directive")
 	}
 
-	result := CheckDirective(nil, directive, source, nil, ctx)
+	result := CheckDirective(nil, nil, directive, source, nil, ctx)
 	if !result.Passed {
 		t.Errorf("expected cmd directive to pass with env sourced, got error: %v", result.Err)
 	}

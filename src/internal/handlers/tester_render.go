@@ -102,10 +102,11 @@ func pickFence(code string) string {
 	return strings.Repeat("`", n)
 }
 
-// classifyBlock returns true if the command itself failed (so directives
-// were never meaningfully evaluated against patterns).
 func commandFailed(o *engine.BlockOutcome) bool {
 	if o == nil || o.ExecResult == nil {
+		return false
+	}
+	if o.Passed {
 		return false
 	}
 	r := o.ExecResult
@@ -114,7 +115,9 @@ func commandFailed(o *engine.BlockOutcome) bool {
 	}
 
 	if r.Status == engine.Completed && r.ExitCode != 0 {
-		return true
+		if o.FailReason != nil && o.FailReason.Error() == fmt.Sprintf("command exited with code %d", r.ExitCode) {
+			return true
+		}
 	}
 	return false
 }
