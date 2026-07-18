@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
+	"github.com/creack/pty"
 	"makedo/internal/nodes"
 )
 
@@ -65,10 +66,10 @@ echo "%s $EXIT_CODE"
 			return &Result{Err: fmt.Errorf("shell environment crashed: %w", err), ExitCode: -1}
 		}
 
-		if strings.HasPrefix(line, markerPrefix) {
-			exitCodeStr := strings.TrimSpace(strings.TrimPrefix(line, markerPrefix))
-			exitCode := 0
-			fmt.Sscanf(exitCodeStr, "%d", &exitCode)
+		cleanLine := string(CleanOutput([]byte(line)))
+		if strings.HasPrefix(cleanLine, markerPrefix) {
+			exitCodeStr := strings.TrimSpace(strings.TrimPrefix(cleanLine, markerPrefix))
+			exitCode, _ := strconv.Atoi(exitCodeStr)
 
 			// Update state
 			if cwdBytes, err := os.ReadFile(cwdFile); err == nil {
@@ -85,6 +86,7 @@ echo "%s $EXIT_CODE"
 			return &Result{
 				Status:   Completed,
 				Output:   buf.Bytes(),
+				CleanOut: CleanOutput(buf.Bytes()),
 				ExitCode: exitCode,
 			}
 		}
@@ -119,7 +121,8 @@ echo '%s 0'
 		if err != nil {
 			return &Result{Err: fmt.Errorf("shell environment crashed during state handoff: %w", err), ExitCode: -1}
 		}
-		if strings.HasPrefix(line, markerPrefix) {
+		cleanLine := string(CleanOutput([]byte(line)))
+		if strings.HasPrefix(cleanLine, markerPrefix) {
 			break
 		}
 	}
@@ -135,20 +138,8 @@ wait`, cwdFile, envFile, cwdFile, envFile, code)
 	shell, flag := getShell()
 	cmd := exec.Command(shell, flag, bgCode)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-
-	stdout, err := cmd.StdoutPipe()
+	ptmx, err := pty.Start(cmd)
 	if err != nil {
-		return &Result{Err: err, ExitCode: -1}
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return &Result{Err: err, ExitCode: -1}
-	}
-
-	if err := cmd.Start(); err != nil {
 		return &Result{Err: err, ExitCode: -1}
 	}
 
@@ -156,9 +147,8 @@ wait`, cwdFile, envFile, cwdFile, envFile, code)
 	done := make(chan struct{})
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go pumpOutput(stdout, output, done, &wg)
-	go pumpOutput(stderr, output, done, &wg)
+	wg.Add(1)
+	go pumpOutput(ptmx, output, done, &wg)
 	go func() {
 		wg.Wait()
 		close(output)
@@ -201,6 +191,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 		return &Result{
 			Status:   Ready,
 			Output:   buf.Bytes(),
+			CleanOut: CleanOutput(buf.Bytes()),
 			Process:  cmd.Process,
 			ExitCode: -1,
 		}
@@ -211,11 +202,13 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 	// Immediate initial check of ALL directives (before any output)
 	// This handles cases where directives pass before command produces output
-	if allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
+	cleanBuf := CleanOutput(buf.Bytes())
+	if allowEarlyExit && checkAllDirectives(cleanBuf, directives, source, compiledPatterns, ctx) {
 		close(done)
 		return &Result{
 			Status:   Ready,
 			Output:   buf.Bytes(),
+			CleanOut: cleanBuf,
 			Process:  cmd.Process,
 			ExitCode: -1,
 		}
@@ -234,6 +227,7 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 				return &Result{
 					Status:   Completed,
 					Output:   buf.Bytes(),
+					CleanOut: CleanOutput(buf.Bytes()),
 					ExitCode: exitCode,
 				}
 			}
@@ -246,11 +240,13 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 			// Fast-track: check ONLY fast directives (out, outr, pwd) on output
 			// cmd directives are checked on ticker to avoid spawning too many processes
-			if hasDirectives && !needsCmdCheck && allowEarlyExit && checkFastDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
+			cleanChunkBuf := CleanOutput(buf.Bytes())
+			if hasDirectives && !needsCmdCheck && allowEarlyExit && checkFastDirectives(cleanChunkBuf, directives, source, compiledPatterns, ctx) {
 				close(done)
 				return &Result{
 					Status:   Ready,
 					Output:   buf.Bytes(),
+					CleanOut: cleanChunkBuf,
 					Process:  cmd.Process,
 					ExitCode: -1,
 				}
@@ -259,11 +255,13 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 		case <-ticker.C:
 			// Full directive check (includes cmd) on ticker
 			// Runs synchronously - only one cmd process at a time
-			if hasDirectives && allowEarlyExit && checkAllDirectives(buf.Bytes(), directives, source, compiledPatterns, ctx) {
+			cleanTickerBuf := CleanOutput(buf.Bytes())
+			if hasDirectives && allowEarlyExit && checkAllDirectives(cleanTickerBuf, directives, source, compiledPatterns, ctx) {
 				close(done)
 				return &Result{
 					Status:   Ready,
 					Output:   buf.Bytes(),
+					CleanOut: cleanTickerBuf,
 					Process:  cmd.Process,
 					ExitCode: -1,
 				}
@@ -460,4 +458,37 @@ func getShell() (shell string, flag string) {
 
 	// Fallback for Unix/macOS/Linux systems if $SHELL is unset
 	return "/bin/sh", "-c"
+}
+
+// CleanOutput strips carriage returns (\r) and ANSI escape codes (colors)
+// from the raw PTY output buffer. This provides a clean string for
+// matching directives via regex or exact string match.
+func CleanOutput(raw []byte) []byte {
+	out := make([]byte, 0, len(raw))
+	inEscape := false
+
+	for i := 0; i < len(raw); i++ {
+		// Strip ANSI escape sequences (e.g. \x1b[32m)
+		if inEscape {
+			// Escape sequence ends with an alphabetic character
+			if (raw[i] >= 'a' && raw[i] <= 'z') || (raw[i] >= 'A' && raw[i] <= 'Z') {
+				inEscape = false
+			}
+			continue
+		}
+		if raw[i] == '\x1b' && i+1 < len(raw) && raw[i+1] == '[' {
+			inEscape = true
+			i++ // skip the '['
+			continue
+		}
+
+		// Strip carriage returns
+		if raw[i] == '\r' {
+			continue
+		}
+
+		out = append(out, raw[i])
+	}
+
+	return out
 }
