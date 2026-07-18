@@ -59,7 +59,10 @@ echo "%s $EXIT_CODE"
 		return &Result{Err: err, ExitCode: -1}
 	}
 
-	var buf bytes.Buffer
+	var rawBuf bytes.Buffer
+	var cleanBuf bytes.Buffer
+	cleaner := NewCleanWriter(&cleanBuf)
+
 	for {
 		line, err := ctx.StdoutReader.ReadString('\n')
 		if err != nil {
@@ -85,8 +88,8 @@ echo "%s $EXIT_CODE"
 
 			return &Result{
 				Status:   Completed,
-				Output:   buf.Bytes(),
-				CleanOut: CleanOutput(buf.Bytes()),
+				Output:   rawBuf.Bytes(),
+				CleanOut: cleanBuf.Bytes(),
 				ExitCode: exitCode,
 			}
 		}
@@ -97,7 +100,8 @@ echo "%s $EXIT_CODE"
 			_, _ = os.Stdout.WriteString(line)
 		}
 
-		buf.WriteString(line)
+		rawBuf.WriteString(line)
+		cleaner.Write([]byte(line))
 	}
 }
 
@@ -178,7 +182,10 @@ func canEarlyExit(directives []*nodes.Directive) bool {
 // TODO: Improve efficiency. We run all the directives when checking. Maybe some directives already passed
 // so technically we shouldn't be checking them. But this is for later.
 func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives []*nodes.Directive, source []byte, stream bool, compiledPatterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *Result {
-	var buf bytes.Buffer
+	var rawBuf bytes.Buffer
+	var cleanBuf bytes.Buffer
+	cleaner := NewCleanWriter(&cleanBuf)
+
 	ticker := time.NewTicker(TickerInterval)
 	defer ticker.Stop()
 
@@ -190,8 +197,8 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 		close(done)
 		return &Result{
 			Status:   Ready,
-			Output:   buf.Bytes(),
-			CleanOut: CleanOutput(buf.Bytes()),
+			Output:   rawBuf.Bytes(),
+			CleanOut: cleanBuf.Bytes(),
 			Process:  cmd.Process,
 			ExitCode: -1,
 		}
@@ -202,13 +209,12 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 	// Immediate initial check of ALL directives (before any output)
 	// This handles cases where directives pass before command produces output
-	cleanBuf := CleanOutput(buf.Bytes())
-	if allowEarlyExit && checkAllDirectives(cleanBuf, directives, source, compiledPatterns, ctx) {
+	if allowEarlyExit && checkAllDirectives(cleanBuf.Bytes(), directives, source, compiledPatterns, ctx) {
 		close(done)
 		return &Result{
 			Status:   Ready,
-			Output:   buf.Bytes(),
-			CleanOut: cleanBuf,
+			Output:   rawBuf.Bytes(),
+			CleanOut: cleanBuf.Bytes(),
 			Process:  cmd.Process,
 			ExitCode: -1,
 		}
@@ -226,13 +232,14 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 				}
 				return &Result{
 					Status:   Completed,
-					Output:   buf.Bytes(),
-					CleanOut: CleanOutput(buf.Bytes()),
+					Output:   rawBuf.Bytes(),
+					CleanOut: cleanBuf.Bytes(),
 					ExitCode: exitCode,
 				}
 			}
 
-			buf.Write(chunk)
+			rawBuf.Write(chunk)
+			cleaner.Write(chunk)
 
 			if stream {
 				_, _ = os.Stdout.Write(chunk)
@@ -240,13 +247,12 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 
 			// Fast-track: check ONLY fast directives (out, outr, pwd) on output
 			// cmd directives are checked on ticker to avoid spawning too many processes
-			cleanChunkBuf := CleanOutput(buf.Bytes())
-			if hasDirectives && !needsCmdCheck && allowEarlyExit && checkFastDirectives(cleanChunkBuf, directives, source, compiledPatterns, ctx) {
+			if hasDirectives && !needsCmdCheck && allowEarlyExit && checkFastDirectives(cleanBuf.Bytes(), directives, source, compiledPatterns, ctx) {
 				close(done)
 				return &Result{
 					Status:   Ready,
-					Output:   buf.Bytes(),
-					CleanOut: cleanChunkBuf,
+					Output:   rawBuf.Bytes(),
+					CleanOut: cleanBuf.Bytes(),
 					Process:  cmd.Process,
 					ExitCode: -1,
 				}
@@ -255,13 +261,12 @@ func monitor(cmd *exec.Cmd, output <-chan []byte, done chan struct{}, directives
 		case <-ticker.C:
 			// Full directive check (includes cmd) on ticker
 			// Runs synchronously - only one cmd process at a time
-			cleanTickerBuf := CleanOutput(buf.Bytes())
-			if hasDirectives && allowEarlyExit && checkAllDirectives(cleanTickerBuf, directives, source, compiledPatterns, ctx) {
+			if hasDirectives && allowEarlyExit && checkAllDirectives(cleanBuf.Bytes(), directives, source, compiledPatterns, ctx) {
 				close(done)
 				return &Result{
 					Status:   Ready,
-					Output:   buf.Bytes(),
-					CleanOut: cleanTickerBuf,
+					Output:   rawBuf.Bytes(),
+					CleanOut: cleanBuf.Bytes(),
 					Process:  cmd.Process,
 					ExitCode: -1,
 				}
@@ -460,9 +465,77 @@ func getShell() (shell string, flag string) {
 	return "/bin/sh", "-c"
 }
 
+const (
+	stateNormal = 0
+	stateSawEsc = 1
+	stateInEsc  = 2
+)
+
+// CleanWriter is a stateful io.Writer that strips ANSI escape sequences and carriage
+// returns (\r) from a stream of bytes, writing the cleaned output to an underlying writer.
+//
+// WHY THIS APPROACH? (Performance & Correctness)
+//  1. Performance (O(N) vs O(N^2)): Long-running background commands can produce megabytes
+//     of output. If we cleaned the entire aggregate buffer retroactively on every incoming
+//     chunk, we would re-parse the entire history repeatedly, creating huge CPU and GC spikes.
+//     By using an io.Writer, we only parse the newly arrived bytes exactly once.
+//  2. Correctness (Chunk Boundaries): PTY output streams arrive in arbitrary chunk sizes.
+//     An ANSI escape sequence (e.g., \x1b[32m) might be sliced perfectly in half across two
+//     chunks. A stateless regex or function would fail to recognize the split sequence.
+//     This state machine safely pauses and resumes stripping across Write() boundaries.
+type CleanWriter struct {
+	Out   io.Writer
+	state int
+}
+
+func NewCleanWriter(out io.Writer) *CleanWriter {
+	return &CleanWriter{Out: out}
+}
+
+func (c *CleanWriter) Write(p []byte) (n int, err error) {
+	clean := make([]byte, 0, len(p))
+	for _, b := range p {
+		switch c.state {
+		case stateNormal:
+			if b == '\x1b' {
+				c.state = stateSawEsc
+				continue
+			}
+			if b == '\r' {
+				continue // Strip carriage returns
+			}
+			clean = append(clean, b)
+
+		case stateSawEsc:
+			if b == '[' {
+				c.state = stateInEsc
+				continue
+			}
+			// Not an ANSI sequence we know how to strip, emit the ESC and the char
+			c.state = stateNormal
+			clean = append(clean, '\x1b', b)
+
+		case stateInEsc:
+			if (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') {
+				c.state = stateNormal // End of escape sequence
+			}
+			// Otherwise, swallow the escape sequence bytes
+		}
+	}
+
+	if len(clean) > 0 {
+		_, err = c.Out.Write(clean)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return len(p), nil
+}
+
 // CleanOutput strips carriage returns (\r) and ANSI escape codes (colors)
-// from the raw PTY output buffer. This provides a clean string for
+// from a raw byte slice. This provides a clean string for
 // matching directives via regex or exact string match.
+// Note: For streaming data, prefer CleanWriter to handle chunk boundaries.
 func CleanOutput(raw []byte) []byte {
 	out := make([]byte, 0, len(raw))
 	inEscape := false

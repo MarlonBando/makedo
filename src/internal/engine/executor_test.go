@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -262,5 +263,118 @@ func TestCheckDirectiveCmdWithEnv(t *testing.T) {
 	result := CheckDirective(nil, directive, source, nil, ctx)
 	if !result.Passed {
 		t.Errorf("expected cmd directive to pass with env sourced, got error: %v", result.Err)
+	}
+}
+
+func TestCleanOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "No ANSI",
+			input:    "Hello World",
+			expected: "Hello World",
+		},
+		{
+			name:     "Carriage Returns",
+			input:    "Line1\r\nLine2\r\n",
+			expected: "Line1\nLine2\n",
+		},
+		{
+			name:     "Simple ANSI Color",
+			input:    "\x1b[32mColorful\x1b[0m",
+			expected: "Colorful",
+		},
+		{
+			name:     "Complex ANSI Codes",
+			input:    "\x1b[1;31;42mError\x1b[0m\r\n",
+			expected: "Error\n",
+		},
+		{
+			name:     "Multiple ANSI Codes",
+			input:    "\x1b[31mRed\x1b[0m \x1b[32mGreen\x1b[0m",
+			expected: "Red Green",
+		},
+		{
+			name:     "ANSI Sequence Not Recognized (No Bracket)",
+			input:    "\x1bA text",
+			expected: "\x1bA text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := CleanOutput([]byte(tt.input))
+			if string(actual) != tt.expected {
+				t.Errorf("CleanOutput() = %q, expected %q", actual, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCleanWriter(t *testing.T) {
+	tests := []struct {
+		name     string
+		chunks   []string
+		expected string
+	}{
+		{
+			name:     "All in one chunk",
+			chunks:   []string{"\x1b[32mGreen\x1b[0m\r\n"},
+			expected: "Green\n",
+		},
+		{
+			name:     "Split after ESC",
+			chunks:   []string{"Hello \x1b", "[32mWorld\x1b[0m"},
+			expected: "Hello World",
+		},
+		{
+			name:     "Split inside ESC bracket",
+			chunks:   []string{"Hello \x1b[", "32mWorld\x1b[0m"},
+			expected: "Hello World",
+		},
+		{
+			name:     "Split inside parameters",
+			chunks:   []string{"Hello \x1b[3", "2mWorld\x1b[0m"},
+			expected: "Hello World",
+		},
+		{
+			name:     "Split just before terminator",
+			chunks:   []string{"Hello \x1b[32", "mWorld\x1b[0m"},
+			expected: "Hello World",
+		},
+		{
+			name:     "Split carriage returns",
+			chunks:   []string{"Line1\r", "\nLine2\r", "\n"},
+			expected: "Line1\nLine2\n",
+		},
+		{
+			name:     "Multiple tiny chunks",
+			chunks:   []string{"\x1b", "[", "3", "1", "m", "R", "e", "d", "\x1b", "[", "0", "m"},
+			expected: "Red",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			cleaner := NewCleanWriter(&out)
+
+			for _, chunk := range tt.chunks {
+				n, err := cleaner.Write([]byte(chunk))
+				if err != nil {
+					t.Fatalf("Write() error = %v", err)
+				}
+				if n != len(chunk) {
+					t.Fatalf("Write() n = %d, expected %d", n, len(chunk))
+				}
+			}
+
+			if out.String() != tt.expected {
+				t.Errorf("CleanWriter output = %q, expected %q", out.String(), tt.expected)
+			}
+		})
 	}
 }
