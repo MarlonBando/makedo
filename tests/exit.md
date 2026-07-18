@@ -51,3 +51,12 @@ bash -c 'exit 5'
 ```
 <!-- out world -->
 <!-- !exit 0 -->
+
+## Expected failure with specific error output
+Should pass when the command fails and outputs the expected error message.
+
+```bash
+bash -c 'echo "critical error"; exit 1'
+```
+<!-- !exit 0 -->
+<!-- out critical error -->
