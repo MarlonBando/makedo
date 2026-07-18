@@ -46,13 +46,27 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 		ctx.Registry.Add(execResult.Process)
 	}
 
+	hasExitDirective := false
+	for _, d := range directives {
+		if d.Kind == nodes.DirectiveExit {
+			if hasExitDirective {
+				outcome.Passed = false
+				outcome.FailReason = fmt.Errorf("multiple exit directives are not allowed in a single block")
+				return outcome
+			}
+			hasExitDirective = true
+		}
+	}
+
 	if execResult.Err != nil {
 		outcome.Passed = false
 		outcome.FailReason = fmt.Errorf("block at line %d crashed: %w", lineNum, execResult.Err)
 		return outcome
 	}
 
-	if execResult.Status == Completed && execResult.ExitCode > 0 {
+	hasAnyDirectives := len(directives) > 0
+
+	if !hasAnyDirectives && execResult.Status == Completed && execResult.ExitCode > 0 {
 		outcome.Passed = false
 		outcome.FailReason = fmt.Errorf("command exited with code %d", execResult.ExitCode)
 	}
@@ -80,7 +94,7 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 
 	// We MUST use execResult.CleanOut (not Output) for FinalOutput.
 	// Commands run inside a PTY inject `\r` (carriage returns) into the raw output buffer.
-	// If we use the raw Output, `makedo embed` will permanently inject those hidden `\r` 
+	// If we use the raw Output, `makedo embed` will permanently inject those hidden `\r`
 	// characters directly into the markdown file, breaking regex matches down the line.
 	if outcome.Passed && len(directives) > 0 {
 		outcome.FinalOutput = SubstituteOutput(bytes.TrimSpace(execResult.CleanOut), directives, source)
@@ -93,16 +107,6 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 
 // testDirective tests a single directive against execution result
 func testDirective(d *nodes.Directive, execResult *Result, source []byte, startLine int, patterns map[*nodes.Directive]*regexp.Regexp, ctx *RunContext) *TestResult {
-	// Handle non-zero exit for completed commands
-	if execResult.Status == Completed && execResult.ExitCode != 0 {
-		return &TestResult{
-			Passed:    false,
-			StartLine: startLine,
-			Expected:  "command to succeed",
-			Actual:    string(execResult.Output),
-			Error:     fmt.Errorf("command exited with code %d", execResult.ExitCode),
-		}
-	}
 
 	// If executor returned Ready, cmd directives already passed during execution
 	if d.Kind == nodes.DirectiveCmd && execResult.Status == Ready {
@@ -115,7 +119,7 @@ func testDirective(d *nodes.Directive, execResult *Result, source []byte, startL
 	}
 
 	// Use shared directive checking against the stripped output
-	check := CheckDirective(execResult.CleanOut, d, source, patterns, ctx)
+	check := CheckDirective(execResult.CleanOut, &execResult.ExitCode, d, source, patterns, ctx)
 	return &TestResult{
 		Passed:    check.Passed,
 		StartLine: startLine,

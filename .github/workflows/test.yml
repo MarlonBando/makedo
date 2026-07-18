@@ -27,18 +27,4 @@ jobs:
         echo "$GITHUB_WORKSPACE/bin" >> $GITHUB_PATH
 
     - name: Run Markdown Tests
-      run: |
-        # Loop through all markdown files in the tests/ folder
-        for test_file in tests/*.md; do
-          echo "Running tests in $test_file"
-          makedo test "$test_file"
-        done
-
-        echo "Running tests in README.md"
-        makedo test README.md
-
-        echo "Running tests in skills/SKILL.md"
-        makedo test skills/SKILL.md
-
-
-
+      run: ./mktest.sh
