@@ -78,10 +78,14 @@ func EvaluateBlock(code string, directives []*nodes.Directive, source []byte, li
 		}
 	}
 
+	// We MUST use execResult.CleanOut (not Output) for FinalOutput.
+	// Commands run inside a PTY inject `\r` (carriage returns) into the raw output buffer.
+	// If we use the raw Output, `makedo embed` will permanently inject those hidden `\r` 
+	// characters directly into the markdown file, breaking regex matches down the line.
 	if outcome.Passed && len(directives) > 0 {
-		outcome.FinalOutput = SubstituteOutput(bytes.TrimSpace(execResult.Output), directives, source)
+		outcome.FinalOutput = SubstituteOutput(bytes.TrimSpace(execResult.CleanOut), directives, source)
 	} else {
-		outcome.FinalOutput = bytes.TrimSpace(execResult.Output)
+		outcome.FinalOutput = bytes.TrimSpace(execResult.CleanOut)
 	}
 
 	return outcome
@@ -110,8 +114,8 @@ func testDirective(d *nodes.Directive, execResult *Result, source []byte, startL
 		}
 	}
 
-	// Use shared directive checking
-	check := CheckDirective(execResult.Output, d, source, patterns, ctx)
+	// Use shared directive checking against the stripped output
+	check := CheckDirective(execResult.CleanOut, d, source, patterns, ctx)
 	return &TestResult{
 		Passed:    check.Passed,
 		StartLine: startLine,

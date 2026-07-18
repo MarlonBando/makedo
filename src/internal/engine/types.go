@@ -17,7 +17,8 @@ const (
 // Result holds command execution result.
 type Result struct {
 	Status   Status
-	Output   []byte      // Captured stdout+stderr
+	Output   []byte      // Captured stdout+stderr (raw)
+	CleanOut []byte      // Cleaned output without ANSI and \r
 	ExitCode int         // -1 if still running or error
 	Process  *os.Process // For cleanup if still running
 	Err      error       // Start/pipe error (not exit failure)
