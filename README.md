@@ -1,4 +1,4 @@
-# makedo
+# MakeDo
 
 Makedo is a tool that bring testing directly inside your markdown documentation.
 Documentation becomes the tests and tests become doumentation.
