@@ -71,15 +71,17 @@ MakeDo will execute the code block and verify the output matches the directive.
 To see a real world application we don't have to go further, this documentation contains makedo directives to assert its behaviour. Let's download the raw markdown file locally and let's take a look at it.
 
 ```bash
-curl -L -O https://raw.githubusercontent.com/MarlonBando/makedo/main/docs/content/getting-started.md
+curl -L -O https://raw.githubusercontent.com/MarlonBando/makedo/refs/heads/main/docs/content/docs/dynamic-types.md
 ```
-<!-- cmd curl https://raw.githubusercontent.com/MarlonBando/makedo/main/docs/content/getting-started.md -->
+<!-- cmd grep -q '# Dynamic Types' dynamic-types.md -->
 
 Open the file in your favourite editor and take a look around to see how every behaviour is asserted.
 
 Now let's run makedo on the file.
 
 ```bash
-makedo test getting-started.md
+makedo test dynamic-types.md
 ```
+<!-- exit 0 -->
+<!-- !out 0/0 -->
 
