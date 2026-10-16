@@ -10,9 +10,24 @@ MakeDo turns your Markdown documentation into executable test suites. Every fenc
 
 ## Installation
 
-Download the latest binary from the releases page or build it from source and place it in your `PATH`:
+Build from source (requires Go 1.24+):
 
-You can check if it's installed by checking the version with 
+```bash
+git clone https://github.com/MarlonBando/makedo.git
+cd makedo
+make build
+sudo cp bin/makedo /usr/local/bin/
+```
+<!-- skip -->
+
+> **Note:** MakeDo supports Linux only. On Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install): install MakeDo inside your WSL distribution with the steps above, then run it from PowerShell in your project folder:
+>
+> ```powershell
+> wsl makedo test README.md
+> ```
+
+Check that it's installed by printing the version:
+
 ```bash
 makedo -v
 ```

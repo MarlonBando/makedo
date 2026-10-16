@@ -1,61 +1,116 @@
-# MakeDo
+# MakeDo: test your CLI with Markdown
 
-Makedo is a tool that bring testing directly inside your markdown documentation.
-Documentation becomes the tests and tests become doumentation.
+Write your CLI's tests in Markdown. The docs are the tests, and the tests are docs anyone can read.
 
-Makedo allows you to:
-- Verify that your documentation is still saying the truth.
-- Run integration and system testing on your cli tool using markdown.
-- Embed the output of your commands automatically inside of the markdown.
-- Run all the fenced code block in a markdown file (useful for setup)
+**[Read the documentation →](https://marlonbando.github.io/makedo/)**
 
-## How does it work?
-Makedo looks for fenced code block followed by html comment in this format `<!-- keyword content -->`
-The content of the comment tells makedo what expect from the code block output.
-When markdown is rendered makedo directives will be hidden, if you want to make them renderable wrap them into backticks`` like we did for this README.md file. 
-
-Let's say we want to verify the flag `-h` of makedo does its job correctly and it prints how to use it.
-We have to add `<!-- out makedo  -->` after the fenced block. We are saying, check that the output contains `makedo [command]`
+Add a directive below a shell code block and MakeDo checks it:
 
 ```bash
-makedo -h
+makedo -v
 ```
-`<!-- out A markdown-based task runner -->`
+`<!-- out ${{version}} -->`
 
-We can also run a cli command to validate our fenced code block.
-For instance our fenced block just installed Git, manually we would use `git -v` to check if it's installed.
-We can tell makedo to do so with `<!-- cmd git -v -->`. Note that this time is hidden 
+Run `makedo test README.md` and every example in this file is executed and verified.
+
+## Why MakeDo
+
+- **Docs that can't lie.** When an example stops working, the test fails.
+- **CLI tests without a test framework.** No harness to write, just commands and the output you expect, in plain Markdown.
+- **A real shell session.** Variables, `cd` and files carry over between blocks. Servers started with `&` keep running in the background and are cleaned up at the end.
+- **Output that writes itself.** `makedo embed` runs your blocks and writes their real output into the doc.
+
+## Install
+
+Build from source (requires Go 1.24+):
 
 ```bash
-echo "Pretending to install git..."
+git clone https://github.com/MarlonBando/makedo.git
+cd makedo
+make build
+sudo cp bin/makedo /usr/local/bin/
 ```
-`<!-- cmd git -v -->`
+<!-- skip -->
 
-### Available directives
-At the moment we have the following directives:
-- out  [content] -> check if stout contains [content]
-- outr [regex] -> check if stout contains [regex]
-- cmd  [content] -> run a command. If it succed the test is passed
-- pwd  [content] -> check if pwd print [content]
-- skip [optional note] -> keep the shell block as normal markdown (makedo will not run/test/embed it)
+> **Note:** MakeDo supports Linux only. On Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install): install MakeDo inside your WSL distribution with the steps above, then run it from PowerShell in your project folder:
+>
+> ```powershell
+> wsl makedo test README.md
+> ```
 
-Shell fenced code blocks with language `bash`, `sh`, `zsh`, or `shell` are processed by default.
-Use `<!-- skip -->` as a hard opt-out when you want to keep a shell block as docs-only content.
+## Quick Start
 
-### Dynamic Types in Directives
-Makedo supports testing dynamic output (like dates, UUIDs, or IP addresses) using a special `${{type}}` syntax. This allows you to match dynamic text without writing complex regular expressions.
+Create `hello.md`:
 
-You can use these types in both `out` and `outr` directives:
+````markdown
 ```bash
-echo "Created user 550e8400-e29b-41d4-a716-446655440000 on 2023-10-25"
+echo "hello world"
 ```
-`<!-- out Created user ${{uuid}} on ${{date}} -->`
+`<!-- out hello world -->`
+````
 
-Available built-in types:
-- `${{date}}`: Matches YYYY-MM-DD
-- `${{time}}`: Matches HH:MM:SS
-- `${{uuid}}`: Matches a standard UUID
-- `${{ip}}`: Matches an IPv4 address
-- `${{number}}`: Matches any integer or decimal number
+Run it:
 
-When used inside an `out` directive, all other text is automatically escaped to ensure a literal match, preventing any regular expression syntax conflicts!
+```bash
+makedo test hello.md
+```
+<!-- skip -->
+
+```text
+hello.md:2 ✓
+
+✓ 1/1 tests passed
+```
+
+## Directives
+
+Directives are HTML comments placed right after a code block. Wrap them in backticks to show them in the rendered page, or leave them bare to hide them.
+
+| Directive | Passes when |
+| :--- | :--- |
+| `out` | the output contains a string |
+| `outr` | the output matches a regular expression |
+| `cmd` | a verification command exits with 0 |
+| `exit` | the block exits with the given code |
+| `pwd` | the current directory matches a pattern |
+| `checkpath` | a file or directory exists |
+| `skip` | never runs: the block is ignored |
+
+Prefix any directive with `!` to negate it. For output that changes on every run, use placeholders like `${{date}}`, `${{uuid}}`, `${{ip}}` or `${{number}}`:
+
+```bash
+echo "Build finished on $(date +%F) in 1.42s"
+```
+`<!-- out Build finished on ${{date}} in ${{number}}s -->`
+
+See the [directives reference](https://marlonbando.github.io/makedo/docs/directives/) and [dynamic types](https://marlonbando.github.io/makedo/docs/dynamic-types/) for details.
+
+## Commands
+
+| Command | What it does |
+| :--- | :--- |
+| `makedo test <file>` | Runs the code blocks and verifies their directives |
+| `makedo embed <file>` | Runs the code blocks and writes their output into the file |
+| `makedo run <file>` | Runs the code blocks, without checks |
+
+## Run It in CI
+
+```yaml
+- uses: actions/setup-go@v5
+  with:
+    go-version: '1.24.x'
+
+- name: Install makedo
+  run: |
+    git clone --depth 1 https://github.com/MarlonBando/makedo.git /tmp/makedo
+    cd /tmp/makedo/src
+    go build -ldflags "-X main.versionString=$(cat ../VERSION)" -o "$HOME/.local/bin/makedo"
+    echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+- name: Test docs
+  run: for f in docs/*.md; do makedo test "$f"; done
+```
+
+## Tested with MakeDo
+
+MakeDo tests itself. Its test suite in [`tests/`](tests/) is 21 Markdown files, every page of the [documentation](https://marlonbando.github.io/makedo/) asserts its own examples, and this README runs in CI too.

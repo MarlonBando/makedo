@@ -10,6 +10,7 @@ headless: true
     - [pwd]({{< relref "/docs/directives/pwd" >}})
     - [checkpath]({{< relref "/docs/directives/checkpath" >}})
     - [skip]({{< relref "/docs/directives/skip" >}})
+    - [exit]({{< relref "/docs/directives/exit" >}})
   - [Dynamic Types]({{< relref "/docs/dynamic-types" >}})
   - [Environment & State]({{< relref "/docs/environment" >}})
   - [Background Processes]({{< relref "/docs/background-processes" >}})
