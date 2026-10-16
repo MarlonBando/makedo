@@ -52,16 +52,12 @@ echo "hello world"
 Run it:
 
 ```bash
-makedo test hello.md
-```
-<!-- skip -->
-
-```text
+$ makedo test hello.md
 hello.md:2 ✓
 
 ✓ 1/1 tests passed
 ```
-
+<!-- skip -->
 ## Directives
 
 Directives are HTML comments placed right after a code block. Wrap them in backticks to show them in the rendered page, or leave them bare to hide them.
