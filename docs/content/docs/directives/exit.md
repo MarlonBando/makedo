@@ -1,7 +1,10 @@
 ---
 title: "exit"
-weight: 7
+weight: 6
+bookToc: true
 ---
+
+# The `exit` Directive
 
 The `exit` directive allows you to assert that a block of code finishes with a specific exit code.
 
@@ -16,27 +19,23 @@ The `exit` directive is useful when you specifically want to assert the exit cod
 ## Positive Assertion
 Checks if the block finished exactly with the specified exit code.
 
-```markdown
 Run a command that we expect to fail with exit code 1:
 
-` ` `bash
+```bash
 bash -c 'exit 1'
-` ` `
-<!-- exit 1 -->
 ```
+`<!-- exit 1 -->`
 
 ## Negative Assertion (`!exit`)
 The `exit` directive supports negation to assert that the block did **not** exit with a specific code.
 This acts similarly to the regular `exit` directive by suppressing the default failure behavior, allowing any other exit code to pass.
 
-```markdown
 Ensure the command doesn't exit with code 0:
 
-` ` `bash
+```bash
 bash -c 'exit 2'
-` ` `
-<!-- !exit 0 -->
 ```
+`<!-- !exit 0 -->`
 
 ## Important Notes
 - **Single Directive:** Only one `exit` directive is allowed per test block. Multiple `exit` directives will result in a syntax error and fail the block immediately.

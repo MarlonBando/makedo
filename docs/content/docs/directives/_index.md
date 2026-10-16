@@ -16,7 +16,7 @@ The general format is:
 ```html
 <!-- [!]keyword content -->
 ```
-<!-- skip -->
+`<!-- skip -->`
 
 - **`!` (Negation)**: An optional exclamation mark before the keyword negates the condition
 - **`keyword`**: Must be one of the recognized directive types
@@ -30,24 +30,26 @@ A single code block can have multiple directives. MakeDo executes the block once
 mkdir -p /tmp/makedo_doc_multi
 echo "multi-directive test"
 ```
-<!-- out multi-directive -->
-<!-- cmd test -d /tmp/makedo_doc_multi -->
+`<!-- out multi-directive -->`
+`<!-- cmd test -d /tmp/makedo_doc_multi -->`
 
 ```bash
 rm -rf /tmp/makedo_doc_multi
 ```
-<!-- cmd test ! -d /tmp/makedo_doc_multi -->
+`<!-- cmd test ! -d /tmp/makedo_doc_multi -->`
 
 Note that only consecutive directive comments are collected. A regular HTML comment breaks the chain.
 
-## Visible Directives
+## Visible and Hidden Directives
 
-By default, HTML comments are invisible in rendered Markdown. If you want directives to be visible in your documentation, wrap them in backticks (inline code):
+Directives are HTML comments, so a bare directive is invisible in rendered Markdown. Wrap it in backticks (inline code) to make it visible, as this documentation does throughout:
 
 ```bash
 echo "visible directive"
 ```
 `<!-- out visible -->`
+
+Leave out the backticks if you want the directive to work without showing up in the rendered page. Both forms are evaluated the same way.
 
 ## Available Directives
 
@@ -59,5 +61,6 @@ echo "visible directive"
 | `pwd` | Assert the current working directory matches a pattern |
 | `checkpath` | Assert a file or directory exists on the filesystem |
 | `skip` | Tell MakeDo to ignore this block entirely |
+| `exit` | Assert the block finished with a specific exit code |
 
 Each directive is documented in detail in the following subsections.

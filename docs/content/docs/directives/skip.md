@@ -15,7 +15,7 @@ Add `<!-- skip -->` after any code block to prevent MakeDo from processing it:
 ```bash
 echo "This code block will NOT be executed by MakeDo"
 ```
-<!-- skip -->
+`<!-- skip -->`
 
 This is useful for:
 - Showing example syntax that should not be run

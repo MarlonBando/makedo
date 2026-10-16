@@ -23,20 +23,20 @@ Install makedo, then test any markdown file:
 ```bash
 makedo test your-documentation.md
 ```
-<!-- skip -->
+`<!-- skip -->`
 
 Or embed command output back into your documentation:
 
 ```bash
 makedo embed your-documentation.md
 ```
-<!-- skip -->
+`<!-- skip -->`
 
 ## How It Works
 
 MakeDo looks for fenced code blocks followed by HTML comment directives in the format `<!-- keyword content -->`. The content of the comment tells MakeDo what to expect from the code block output.
 
-When the Markdown is rendered, MakeDo directives are hidden since they are HTML comments. If you want to make them visible in rendered documentation, wrap them in backticks.
+Because directives are HTML comments, a bare directive is hidden when the Markdown is rendered. Wrap it in backticks, as in the examples on this site, to make it visible.
 
 ## Example
 
