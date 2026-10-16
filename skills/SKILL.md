@@ -9,11 +9,11 @@ metadata:
 
 ## What is makedo?
 
-Makedo is a tool that brings integration testing directly inside your markdown documentation. Documentation becomes the tests, and tests become documentation.
+Makedo is a tool that brings testing directly inside your markdown documentation. Documentation becomes the tests, and tests become documentation.
 
 Makedo allows you to:
 - Verify that your documentation is still saying the truth
-- Run integration testing on your cli tool using markdown
+- Test your cli tool using markdown
 - Run all the codes in a markdown file (useful for setup)
 
 **Note for the agent**: This skill file is already an example of `makedo` usage! The code blocks below are followed by HTML comments that `makedo` uses to validate the output. You can run `makedo test skills/SKILL.md` to verify this file.
@@ -22,7 +22,7 @@ Makedo allows you to:
 
 Use this tool when you need to:
 - Write documentation that needs to be automatically tested against regressions.
-- Embed CLI integration tests directly within your markdown files.
+- Embed CLI tests directly within your markdown files.
 - Ensure that the commands in your README or docs actually produce the output they claim to produce.
 - Use dynamic types like `${{date}}` or `${{uuid}}` to verify outputs that change on every run.
 

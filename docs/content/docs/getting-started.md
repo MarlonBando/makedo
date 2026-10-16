@@ -10,13 +10,32 @@ MakeDo turns your Markdown documentation into executable test suites. Every fenc
 
 ## Installation
 
-Download the latest binary from the releases page or build it from source and place it in your `PATH`:
+Build from source (requires Go 1.24+):
 
-You can check if it's installed by checking the version with 
+```bash
+git clone https://github.com/MarlonBando/makedo.git
+cd makedo
+make build
+sudo cp bin/makedo /usr/local/bin/
+```
+<!-- skip -->
+
+> **Note:** MakeDo supports Linux only. On Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install): install MakeDo inside your WSL distribution with the steps above, then run it from PowerShell in your project folder:
+>
+> ```powershell
+> wsl makedo test README.md
+> ```
+
+Check that it's installed by printing the version:
+
 ```bash
 makedo -v
 ```
-<!-- out ${{version}} -->
+`<!-- out ${{version}} -->`
+
+```stdout
+${{version}}
+```
 
 ## Available Commands
 
@@ -33,17 +52,37 @@ You can see all available commands with:
 ```bash
 makedo -h
 ```
-<!-- out Available Commands -->
-<!-- out test -->
-<!-- out embed -->
-<!-- out run -->
+`<!-- out Available Commands -->`
+`<!-- out test -->`
+`<!-- out embed -->`
+`<!-- out run -->`
+
+```stdout
+A markdown-based task runner
+
+Usage:
+  makedo [flags]
+  makedo [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  embed       Run fenced code blocks and embed output into the markdown file
+  help        Help about any command
+  run         Run fenced code blocks from a markdown file
+  test        Test code blocks in your markdown file
+
+Flags:
+  -h, --help      help for makedo
+  -v, --version   Print version
+
+Use "makedo [command] --help" for more information about a command.
+```
 
 ## Your First Test
 
 Create a Markdown file called `hello.md` with a code block and a directive.
 
-
-You can do it by copy and past the content of this block into the file
+You can do it by copying the content of this block into the file:
 ````markdown
 ```bash
 echo hello world!
@@ -51,37 +90,61 @@ echo hello world!
 <!-- out hello world! -->
 ````
 
-or by running this command in your terminal
+or by running this command in your terminal:
 ```bash
 printf '```bash\necho hello world!\n```\n<!-- out hello world! -->\n' > hello.md
 ```
-<!-- checkpath hello.md -->
+`<!-- checkpath hello.md -->`
 
 Then run:
 
 ```bash
 makedo test hello.md
 ```
-<!-- out 1/1 -->
+`<!-- out 1/1 -->`
+
+```stdout
+hello.md:2 ✓
+
+✓ 1/1 tests passed
+```
 
 MakeDo will execute the code block and verify the output matches the directive.
 
-## A practicle example
+## A Practical Example
 
-To see a real world application we don't have to go further, this documentation contains makedo directives to assert its behaviour. Let's download the raw markdown file locally and let's take a look at it.
+For a real-world example you don't have to look far: this documentation is itself tested with MakeDo. Every page contains directives that assert the behaviour it describes. Download the raw Markdown of the Dynamic Types page:
 
 ```bash
-curl -L -O https://raw.githubusercontent.com/MarlonBando/makedo/refs/heads/main/docs/content/docs/dynamic-types.md
+curl -sSLO https://raw.githubusercontent.com/MarlonBando/makedo/refs/heads/main/docs/content/docs/dynamic-types.md
 ```
-<!-- cmd grep -q '# Dynamic Types' dynamic-types.md -->
+`<!-- cmd grep -q '# Dynamic Types' dynamic-types.md -->`
 
-Open the file in your favourite editor and take a look around to see how every behaviour is asserted.
+Open the file in your favourite editor and look at how every behaviour is asserted.
 
-Now let's run makedo on the file.
+Now run MakeDo on it:
 
 ```bash
 makedo test dynamic-types.md
 ```
-<!-- exit 0 -->
-<!-- !out 0/0 -->
+`<!-- exit 0 -->`
+`<!-- out tests passed -->`
 
+```stdout
+dynamic-types.md:35 ✓
+dynamic-types.md:42 ✓
+dynamic-types.md:50 ✓
+dynamic-types.md:66 ✓
+
+✓ 4/4 tests passed
+```
+
+## Cleanup
+
+Remove the files created in this guide:
+
+```bash
+rm -f hello.md dynamic-types.md
+```
+`<!-- !checkpath hello.md -->`
+`<!-- !checkpath dynamic-types.md -->`

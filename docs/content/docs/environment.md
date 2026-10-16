@@ -16,7 +16,7 @@ Every code block is executed in the **same, persistent shell process**. Variable
 MY_VAR="defined_here"
 echo "MY_VAR is set to: $MY_VAR"
 ```
-<!-- out MY_VAR is set to: defined_here -->
+`<!-- out MY_VAR is set to: defined_here -->`
 
 ```stdout
 MY_VAR is set to: defined_here
@@ -26,7 +26,7 @@ In the next block, `MY_VAR` is still available:
 ```bash
 echo "MY_VAR is now: ${MY_VAR:-empty}"
 ```
-<!-- out MY_VAR is now: defined_here -->
+`<!-- out MY_VAR is now: defined_here -->`
 
 ```stdout
 MY_VAR is now: defined_here
@@ -44,7 +44,7 @@ cd /tmp/makedo_doc_env_dir
 ```bash
 pwd
 ```
-<!-- out /tmp/makedo_doc_env_dir -->
+`<!-- out /tmp/makedo_doc_env_dir -->`
 
 ```stdout
 /tmp/makedo_doc_env_dir
@@ -62,7 +62,7 @@ And printing out the content of the file we can see it actually persisted:
 ```bash
 cat /tmp/makedo_doc_persist.txt
 ```
-<!-- out persisted -->
+`<!-- out persisted -->`
 
 ```stdout
 persisted
@@ -74,5 +74,5 @@ persisted
 cd /
 rm -rf /tmp/makedo_doc_env_dir /tmp/makedo_doc_persist.txt
 ```
-<!-- !checkpath /tmp/makedo_doc_env_dir -->
-<!-- !checkpath /tmp/makedo_doc_persist.txt -->
+`<!-- !checkpath /tmp/makedo_doc_env_dir -->`
+`<!-- !checkpath /tmp/makedo_doc_persist.txt -->`

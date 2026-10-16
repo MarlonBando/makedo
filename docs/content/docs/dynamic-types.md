@@ -29,12 +29,18 @@ Use the `${{typeName}}` syntax inside directives:
 
 ## Examples
 
+The `stdout` blocks below were generated with `makedo embed`. Because the directives use placeholders, the actual runtime values were replaced with the placeholder syntax, which is why they show `${{time}}` instead of a real time. See [How It Works](#how-it-works).
+
 ### Matching Time
 
 ```bash
 date +%T
 ```
-<!-- out ${{time}} -->
+`<!-- out ${{time}} -->`
+
+```stdout
+${{time}}
+```
 
 ### Matching UUID
 
@@ -42,14 +48,20 @@ date +%T
 uuid=$(uuidgen)
 echo "$uuid"
 ```
-<!-- out ${{uuid}} -->
+`<!-- out ${{uuid}} -->`
+```stdout
+${{uuid}}
+```
 
 ### Matching Version
 
 ```bash
 echo "v3.4.5"
 ```
-<!-- out v${{version}} -->
+`<!-- out v${{version}} -->`
+```stdout
+v${{version}}
+```
 
 ## How It Works
 
@@ -65,4 +77,7 @@ Dynamic types work with negation too:
 ```bash
 echo "not a uuid"
 ```
-<!-- !outr ${{uuid}} -->
+`<!-- !outr ${{uuid}} -->`
+```stdout
+not a uuid
+```

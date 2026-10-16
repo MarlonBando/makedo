@@ -22,14 +22,14 @@ You can start a long-running server and immediately use it in the next block:
 ```bash
 python3 -m http.server 8877 2>&1 &
 ```
-<!-- cmd curl -s http://localhost:8877 > /dev/null 2>&1 -->
+`<!-- cmd curl -s http://localhost:8877 > /dev/null 2>&1 -->`
 
 The server is now running. You can interact with it:
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8877
 ```
-<!-- out 200 -->
+`<!-- out 200 -->`
 
 At the end of this page, MakeDo automatically kills the server.
 

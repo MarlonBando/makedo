@@ -25,7 +25,7 @@ echo "hello embed"
 ```
 <!-- out hello embed -->
 ````
-<!-- skip -->
+`<!-- skip -->`
 
 Running `makedo embed` will produce:
 
@@ -39,7 +39,7 @@ echo "hello embed"
 hello embed
 ```
 ````
-<!-- skip -->
+`<!-- skip -->`
 
 ## Dynamic Type Substitution
 
