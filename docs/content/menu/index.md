@@ -15,3 +15,4 @@ headless: true
   - [Environment & State]({{< relref "/docs/environment" >}})
   - [Background Processes]({{< relref "/docs/background-processes" >}})
   - [Embed Command]({{< relref "/docs/embed-command" >}})
+  - [Thesis]({{< relref "/docs/thesis" >}})

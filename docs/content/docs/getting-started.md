@@ -10,7 +10,20 @@ MakeDo turns your Markdown documentation into executable test suites. Every fenc
 
 ## Installation
 
-Build from source (requires Go 1.24+):
+Download the zip for your platform from the [latest release](https://github.com/MarlonBando/makedo/releases/latest). Each zip contains a single `makedo` binary: unzip it and move it somewhere on your `PATH`.
+
+```bash
+VERSION=0.1.0
+OS=linux      # or darwin
+ARCH=amd64    # or arm64
+curl -LO "https://github.com/MarlonBando/makedo/releases/download/${VERSION}/makedo_${VERSION}_${OS}_${ARCH}.zip"
+unzip "makedo_${VERSION}_${OS}_${ARCH}.zip"
+sudo mv makedo /usr/local/bin/    # or: mv makedo ~/.local/bin/
+makedo --version
+```
+<!-- skip -->
+
+Or build from source (requires Go 1.24+):
 
 ```bash
 git clone https://github.com/MarlonBando/makedo.git
@@ -20,7 +33,7 @@ sudo cp bin/makedo /usr/local/bin/
 ```
 <!-- skip -->
 
-> **Note:** MakeDo supports Linux only. On Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install): install MakeDo inside your WSL distribution with the steps above, then run it from PowerShell in your project folder:
+> **Note:** MakeDo supports bash only. On Windows, use [WSL](https://learn.microsoft.com/windows/wsl/install): install MakeDo inside your WSL distribution with the steps above, then run it from PowerShell in your project folder:
 >
 > ```powershell
 > wsl makedo test README.md
@@ -137,6 +150,26 @@ dynamic-types.md:50 ✓
 dynamic-types.md:66 ✓
 
 ✓ 4/4 tests passed
+```
+
+## Run It in CI
+
+Add MakeDo to your GitHub Actions workflow to test your docs on every push:
+
+```yaml
+- uses: actions/setup-go@v5
+  with:
+    go-version: '1.24.x'
+
+- name: Install makedo
+  run: |
+    git clone --depth 1 https://github.com/MarlonBando/makedo.git /tmp/makedo
+    cd /tmp/makedo/src
+    go build -ldflags "-X main.versionString=$(cat ../VERSION)" -o "$HOME/.local/bin/makedo"
+    echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+- name: Test docs
+  run: for f in docs/*.md; do makedo test "$f"; done
 ```
 
 ## Cleanup
